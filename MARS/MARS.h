@@ -12,44 +12,48 @@
 class MARS {
 private:
     std::array<DWORD, 4> D;
-    std::array<DWORD, 40> K{}; // keys
+    std::array<DWORD, 40> K{};
 
-    DWORD S[512]; // S-box
+    DWORD S[512];
     DWORD *S0;
     DWORD *S1;
 
     DWORD mod;
 
+
     DWORD makeMask(const DWORD &w);
 
-    void keyGeneration(const std::vector<DWORD> &key);
+    void keyExpansion(const std::vector<DWORD> &key);
 
     DWORD circularShiftsR(const DWORD &D, const size_t &count);
 
     DWORD circularShiftsL(const DWORD &D, const size_t &count);
 
-    void forwardMode(const unsigned int &roundNumber);
-
-    void backwardsMode(const unsigned int &roundNumber);
-
-    void directMixingRound();
 
     void forwardMixing();
+
+    void forwardMixingDecryption();
+
 
     std::tuple<DWORD, DWORD, DWORD> E_function(const DWORD &D, const DWORD &key1, const DWORD &key2);
 
     void cryptographicCore();
 
-    void reverseMixingRound();
+    void cryptographicCoreDecryption();
+
 
     void backwardsMixing();
+
+    void backwardsMixingDecryption();
 
 public:
     explicit MARS();
 
     std::array<DWORD, 4> getCiphertext(const std::vector<DWORD> &D, const std::vector<DWORD> &key);
 
-    std::array<DWORD, 4> getEncrypted(const std::vector<DWORD> &D, const std::vector<DWORD> &key);
+    std::array<DWORD, 4> getPlaintext(const std::vector<DWORD> &D, const std::vector<DWORD> &key);
+
+    std::vector<DWORD> getRandomKey();
 
 };
 

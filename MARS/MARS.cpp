@@ -6,6 +6,9 @@
 #include <iostream>
 #include <bitset>
 #include <tuple>
+#include <algorithm>
+#include <random>
+#include <chrono>
 
 #include "MARS.h"
 
@@ -191,18 +194,19 @@ DWORD MARS::makeMask(const DWORD &w) {
     return mask_binary.to_ulong();
 }
 
-void MARS::keyGeneration(const std::vector<DWORD> &key) {
+void MARS::keyExpansion(const std::vector<DWORD> &key) {
     std::array<DWORD, 15> T{};
     std::copy(key.begin(), key.end(), K.begin());
+    std::copy(key.begin(), key.end(), T.begin());
     T[key.size()] = key.size();
 
     for (int j = 0; j < 4; j++) {
         for (int i = 0; i < 15; i++) {
             // fixme: вправо или влево?
-            T[i] = T[i] ^ circularShiftsL(T[(i - 7 + 15) % 15] ^ T[(i - 2 + 15) % 15], 3) ^ (4 * i + j);
+            T[i] = T[i] ^ circularShiftsL(T[(i + 8) % 15] ^ T[(i + 13) % 15], 3) ^ (4 * i + j);
         }
         for (int i = 0; i < 15; i++) {
-            T[i] = circularShiftsL(T[i] + S[511 & T[(i - 1 + 15) % 15]], 9);
+            T[i] = circularShiftsL(T[i] + S[511 & T[(i + 14) % 15]], 9);
         }
         for (int i = 0; i < 10; i++) {
             K[10 * j + i] = T[(4 * i) % 15];
@@ -231,59 +235,67 @@ DWORD MARS::circularShiftsL(const DWORD &D, const size_t &count) {
 }
 
 
-void MARS::directMixingRound() {
-    BYTE *b = reinterpret_cast<BYTE *>(&D[0]);
-    D[1] ^= S0[b[0]];
-    D[1] = (D[1] + S1[b[1]]) % mod;
-    D[2] = (D[2] + S0[b[2]]) % mod;
-    D[3] ^= S1[b[3]];
-    D[0] = circularShiftsR(D[0], 24);
-    D[0] = (D[0] + D[3]) % mod;
+void MARS::forwardMixingDecryption() {
+    for (int i = 0; i < 4; i++)
+        D[i] = (D[i] + K[36 + i]) % mod;
 
-    b = reinterpret_cast<BYTE *>(&D[1]);
-    D[2] ^= S0[b[0]];
-    D[0] ^= S1[b[3]];
-    D[2] = (D[2] + S1[b[1]]) % mod;
-    D[3] = (D[3] + S0[b[2]]) % mod;
-    D[1] = circularShiftsR(D[1], 24);
-    D[1] = (D[1] + D[2]) % mod;
+    for (int i = 7; i >= 0; i--) {
+        std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
 
-    b = reinterpret_cast<BYTE *>(&D[2]);
-    D[3] ^= S0[b[0]];
-    D[0] = (D[0] + S0[b[2]]) % mod;
-    D[1] ^= S1[b[3]];
-    D[3] = (D[3] + S1[b[1]]) % mod;
-    D[2] = circularShiftsR(D[2], 24);
+        D[0] = circularShiftsR(D[0], 24);
 
-    b = reinterpret_cast<BYTE *>(&D[3]);
-    D[0] ^= S0[b[0]];
-    D[0] = (D[0] + S1[b[1]]) % mod;
-    D[1] = (D[1] + S0[b[2]]) % mod;
-    D[2] ^= S1[b[3]];
-    D[3] = circularShiftsR(D[3], 24);
+        auto b = reinterpret_cast<BYTE *>(&D[0]);
+        D[3] = D[3] ^ S0[b[1]];
+        D[3] = (D[3] + S1[b[2]]) % mod;
+        D[2] = (D[2] + S0[b[3]]) % mod;
+        D[1] = D[1] ^ S1[b[0]];
+
+        if (i == 2 or i == 6) {
+            D[0] = (D[0] + D[3]) % mod;
+        }
+        if (i == 3 or i == 7) {
+            D[0] = (D[0] + D[1]) % mod;
+        }
+    }
 }
 
 void MARS::forwardMixing() {
     for (int i = 0; i < 4; i++)
         D[i] = (D[i] + K[i]) % mod;
 
-    // TODO: сколько раз повторяется?
-    for (int i = 0; i < 2; i++) {
-        directMixingRound();
+    for (int i = 0; i < 8; i++) {
+        auto b = reinterpret_cast<BYTE *>(&D[0]);
+
+        D[1] = D[1] ^ S0[b[0]];
+        D[1] = (D[1] + S1[b[1]]) % mod;
+        D[2] = (D[2] + S0[b[2]]) % mod;
+        D[3] = D[3] ^ S1[b[3]];
+
+        D[0] = circularShiftsR(D[0], 24);
+
+        if (i == 0 or i == 4) {
+            D[0] = (D[0] + D[3]) % mod;
+        }
+        if (i == 1 or i == 5) {
+            D[0] = (D[0] + D[1]) % mod;
+        }
+
+        std::rotate(D.begin(), D.begin() + 1, D.end());
     }
 }
 
-std::tuple<DWORD, DWORD, DWORD> MARS::E_function(const DWORD &D, const DWORD &key1, const DWORD &key2) {
-    DWORD y1 = 0;
-    DWORD y2 = D;
-    DWORD y3 = D;
 
-    y3 = circularShiftsL(y3, 13);
-    y3 = y3 * key2 % mod;
+std::tuple<DWORD, DWORD, DWORD> MARS::E_function(const DWORD &D, const DWORD &key1, const DWORD &key2) {
+    DWORD y1;
+    DWORD y2;
+    DWORD y3;
+
+    y2 = (D + key1) % mod;
+    y3 = (circularShiftsL(D, 13) * key2) % mod;
+    y1 = S[511 & y2];
     y3 = circularShiftsL(y3, 5);
-    y2 = (y2 + key1) % mod;
-    y1 = S[511 & y2] ^ y3;
     y2 = circularShiftsL(y2, 31 & y3);
+    y1 = y1 ^ y3;
     y3 = circularShiftsL(y3, 5);
     y1 = y1 ^ y3;
     y1 = circularShiftsL(y1, 31 & y3);
@@ -291,95 +303,95 @@ std::tuple<DWORD, DWORD, DWORD> MARS::E_function(const DWORD &D, const DWORD &ke
     return {y1, y2, y3};
 }
 
-void MARS::forwardMode(const unsigned int &roundNumber) {
-    DWORD D_copy[4];
 
-    auto[y1, y2, y3] = E_function(D[0], K[2 * roundNumber + 4], K[2 * roundNumber + 5]);
-    D_copy[0] = circularShiftsL(D[0], 13);
-    D_copy[1] = (D[1] + y1) % mod;
-    D_copy[2] = (D[2] + y2) % mod;
-    D_copy[3] = D[3] ^ y3;
+void MARS::cryptographicCoreDecryption() {
+    for (int i = 15; i >= 0; i--) {
+        std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
 
-//    std::cout << D_copy[0] << " "<< D_copy[1] << " "<< D_copy[2] << " "<< D_copy[3] << "\n";
-    // TODO: надо ли 2 часть?
-    std::tie(y1, y2, y3) = E_function(D_copy[1], K[2 * roundNumber + 4], K[2 * roundNumber + 5]);
-    D[0] = (D_copy[2] + y1) % mod;
-    D[1] = (D_copy[3] + y2) % mod;
-    D[2] = D_copy[0] ^ y3;
-    D[3] = circularShiftsL(D_copy[1], 13);
+        D[0] = circularShiftsR(D[0], 13);
 
-//    std::cout << D[0] << " "<< D[1] << " "<< D[2] << " "<< D[3] << "\n\n";
-}
-
-void MARS::backwardsMode(const unsigned int &roundNumber) {
-    DWORD D_copy[4];
-
-    auto[y1, y2, y3] = E_function(D[0], K[2 * roundNumber + 4], K[2 * roundNumber + 5]);
-    D_copy[0] = circularShiftsL(D[0], 13);
-    D_copy[1] = D[1] ^ y3;
-    D_copy[2] = (D[2] + y2) % mod;
-    D_copy[3] = (D[3] + y1) % mod;
-
-    // TODO: надо ли 2 часть?
-    std::tie(y1, y2, y3) = E_function(D_copy[1], K[2 * roundNumber + 4], K[2 * roundNumber + 5]);
-    D[0] = D_copy[2] ^ y3;
-    D[1] = (D_copy[3] + y2) % mod;
-    D[2] = (D_copy[0] + y1) % mod;
-    D[3] = circularShiftsL(D_copy[1], 13);
+        auto[y1, y2, y3] = E_function(D[0], K[2 * i + 4], K[2 * i + 5]);
+        D[2] = (D[2] - y2 + mod) % mod;
+        if (i < 8) {
+            D[1] = (D[1] - y1 + mod) % mod;
+            D[3] = D[3] ^ y3;
+        } else {
+            D[3] = (D[3] - y1 + mod) % mod;
+            D[1] = D[1] ^ y3;
+        }
+    }
 }
 
 void MARS::cryptographicCore() {
-    for (int i = 0; i < 8; i++)
-        forwardMode(static_cast<const unsigned int &>(i));
-    for (int i = 8; i < 16; i++)
-        backwardsMode(static_cast<const unsigned int &>(i));
+    for (int i = 0; i < 16; i++) {
+        auto[y1, y2, y3] = E_function(D[0], K[2 * i + 4], K[2 * i + 5]);
+        D[0] = circularShiftsL(D[0], 13);
+        D[2] = (D[2] + y2) % mod;
+        if (i < 8) {
+            D[1] = (D[1] + y1) % mod;
+            D[3] = D[3] ^ y3;
+        } else {
+            D[3] = (D[3] + y1) % mod;
+            D[1] = D[1] ^ y3;
+        }
+
+        std::rotate(D.begin(), D.begin() + 1, D.end());
+    }
 }
 
-void MARS::reverseMixingRound() {
-    BYTE *b = reinterpret_cast<BYTE *>(&D[0]);
-    D[1] ^= S1[b[0]];
-    D[2] = (D[2] - S0[b[1]] + mod) % mod;
-    D[3] = (D[3] - S1[b[2]] + mod) % mod;
-    D[3] ^= S0[b[3]];
-    D[0] = circularShiftsL(D[0], 24);
 
-    b = reinterpret_cast<BYTE *>(&D[1]);
-    D[2] ^= S1[b[0]];
-    D[3] = (D[3] - S0[b[1]] + mod) % mod;
-    D[0] = (D[0] - S1[b[2]] + mod) % mod;
-    D[0] += S0[b[3]] % mod;
-    D[1] = circularShiftsL(D[1], 24);
-    D[2] = (D[2] - D[1] + mod) % mod;
+void MARS::backwardsMixingDecryption() {
+    for (int i = 7; i >= 0; i--) {
+        std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
 
-    b = reinterpret_cast<BYTE *>(&D[2]);
-    D[3] ^= S1[b[0]];
-    D[0] = (D[0] - S0[b[1]] + mod) % mod;
-    D[1] = (D[1] - S1[b[2]] + mod) % mod;
-    D[1] ^= S0[b[3]];
-    D[2] = circularShiftsL(D[2], 24);
-    D[3] = (D[3] - D[0] + mod) % mod;
+        if (i == 0 or i == 4) {
+            D[0] = (D[0] - D[3] + mod) % mod;
+        }
+        if (i == 1 or i == 5) {
+            D[0] = (D[0] - D[1] + mod) % mod;
+        }
 
-    b = reinterpret_cast<BYTE *>(&D[3]);
-    D[0] ^= S1[b[0]];
-    D[1] = (D[1] - S0[b[1]] + mod) % mod;
-    D[2] = (D[2] - S1[b[2]] + mod) % mod;
-    D[2] ^= S0[b[3]];
-    D[3] = circularShiftsL(D[3], 24);
-}
+        D[0] = circularShiftsL(D[0], 24);
 
-void MARS::backwardsMixing() {
-    // TODO: сколько раз повторяется?
-    for (int i = 0; i < 2; i++) {
-        reverseMixingRound();
+        BYTE *b = reinterpret_cast<BYTE *>(&D[0]);
+        D[3] = D[3] ^ S1[b[3]];
+        D[2] = (D[2] - S0[b[2]] + mod) % mod;
+        D[1] = (D[1] - S1[b[1]] + mod) % mod;
+        D[1] = D[1] ^ S0[b[0]];
     }
 
     for (int i = 0; i < 4; i++)
-        D[i] = (D[i] - K[i + 36] + mod) % mod;
+        D[i] = (D[i] - K[i] + mod) % mod;
 }
+
+void MARS::backwardsMixing() {
+    for (int i = 0; i < 8; i++) {
+        if (i == 2 or i == 6) {
+            D[0] = (D[0] - D[3] + mod) % mod;
+        }
+        if (i == 3 or i == 7) {
+            D[0] = (D[0] - D[1] + mod) % mod;
+        }
+
+        BYTE *b = reinterpret_cast<BYTE *>(&D[0]);
+        D[1] = D[1] ^ S1[b[0]];
+        D[2] = (D[2] - S0[b[3]] + mod) % mod;
+        D[3] = (D[3] - S1[b[2]] + mod) % mod;
+        D[3] = D[3] ^ S0[b[1]];
+
+        D[0] = circularShiftsL(D[0], 24);
+
+        std::rotate(D.begin(), D.begin() + 1, D.end());
+    }
+
+    for (int i = 0; i < 4; i++)
+        D[i] = (D[i] - K[36 + i] + mod) % mod;
+}
+
 
 std::array<DWORD, 4> MARS::getCiphertext(const std::vector<DWORD> &D, const std::vector<DWORD> &key) {
     std::copy(D.begin(), D.end(), this->D.begin());
-    keyGeneration(key);
+    keyExpansion(key);
 
     forwardMixing();
     cryptographicCore();
@@ -388,109 +400,28 @@ std::array<DWORD, 4> MARS::getCiphertext(const std::vector<DWORD> &D, const std:
     return this->D;
 }
 
-std::array<DWORD, 4> MARS::getEncrypted(const std::vector<DWORD> &Dw, const std::vector<DWORD> &key) {
-    std::copy(Dw.begin(), Dw.end(), this->D.begin());
-    keyGeneration(key);
+std::array<DWORD, 4> MARS::getPlaintext(const std::vector<DWORD> &D, const std::vector<DWORD> &key) {
+    std::copy(D.begin(), D.end(), this->D.begin());
+    keyExpansion(key);
 
-    for (int i = 0; i < 4; i++)
-        D[i] = (D[i] + K[i + 36]) % mod;
+    forwardMixingDecryption();
+    cryptographicCoreDecryption();
+    backwardsMixingDecryption();
 
-    // TODO: сколько раз повторяется?
-    for (int i = 0; i < 8; i++) {
-        BYTE *b = reinterpret_cast<BYTE *>(&D[0]);
-        D[1] ^= S0[b[0]];
-        D[1] = (D[1] + S1[b[1]]) % mod;
-        D[2] = (D[2] + S0[b[2]]) % mod;
-        D[3] ^= S1[b[3]];
-        D[0] = circularShiftsR(D[0], 24);
-        D[0] = (D[0] + D[3]) % mod;
-
-        b = reinterpret_cast<BYTE *>(&D[1]);
-        D[2] ^= S0[b[0]];
-        D[0] ^= S1[b[3]];
-        D[2] = (D[2] + S1[b[1]]) % mod;
-        D[3] = (D[3] + S0[b[2]]) % mod;
-        D[1] = circularShiftsR(D[1], 24);
-        D[1] = (D[1] + D[2]) % mod;
-
-        b = reinterpret_cast<BYTE *>(&D[2]);
-        D[3] ^= S0[b[0]];
-        D[0] = (D[0] + S0[b[2]]) % mod;
-        D[1] ^= S1[b[3]];
-        D[3] = (D[3] + S1[b[1]]) % mod;
-        D[2] = circularShiftsR(D[2], 24);
-
-        b = reinterpret_cast<BYTE *>(&D[3]);
-        D[0] ^= S0[b[0]];
-        D[0] = (D[0] + S1[b[1]]) % mod;
-        D[1] = (D[1] + S0[b[2]]) % mod;
-        D[2] ^= S1[b[3]];
-        D[3] = circularShiftsR(D[3], 24);
-
-        b = reinterpret_cast<BYTE *>(&D[0]);
-        D[1] ^= S0[b[0]];
-        D[1] = (D[1] + S1[b[1]]) % mod;
-        D[2] = (D[2] + S0[b[2]]) % mod;
-        D[3] ^= S1[b[3]];
-        D[0] = circularShiftsR(D[0], 24);
-        D[0] = (D[0] + D[3]) % mod;
-
-        b = reinterpret_cast<BYTE *>(&D[1]);
-        D[2] ^= S0[b[0]];
-        D[0] ^= S1[b[3]];
-        D[2] = (D[2] + S1[b[1]]) % mod;
-        D[3] = (D[3] + S0[b[2]]) % mod;
-        D[1] = circularShiftsR(D[1], 24);
-        D[1] = (D[1] + D[2]) % mod;
-
-        b = reinterpret_cast<BYTE *>(&D[2]);
-        D[3] ^= S0[b[0]];
-        D[0] = (D[0] + S0[b[2]]) % mod;
-        D[1] ^= S1[b[3]];
-        D[3] = (D[3] + S1[b[1]]) % mod;
-        D[2] = circularShiftsR(D[2], 24);
-
-        b = reinterpret_cast<BYTE *>(&D[3]);
-        D[0] ^= S0[b[0]];
-        D[0] = (D[0] + S1[b[1]]) % mod;
-        D[1] = (D[1] + S0[b[2]]) % mod;
-        D[2] ^= S1[b[3]];
-        D[3] = circularShiftsR(D[3], 24);
-    }
-
-    for (int i = 0; i < 8; i++) {
-        DWORD D_copy[4];
-
-        auto[y1, y2, y3] = E_function(D[0], K[2 * i + 4], K[2 * i + 5]);
-        D_copy[0] = circularShiftsL(D[0], 13);
-        D_copy[1] = (D[1] - y1 + mod) % mod;
-        D_copy[2] = (D[2] - y2 + mod) % mod;
-        D_copy[3] = D[3] ^ y3;
-
-        std::tie(y1, y2, y3) = E_function(D_copy[1], K[2 * i + 4], K[2 * i + 5]);
-        D[3] = (D_copy[2] - y1 + mod) % mod;
-        D[2] = (D_copy[3] - y2 + mod) % mod;
-        D[1] = D_copy[0] ^ y3;
-        D[0] = circularShiftsL(D_copy[1], 13);
-    }
-    for (int i = 0; i < 8; i++) {
-        DWORD D_copy[4];
-
-        auto[y1, y2, y3] = E_function(D[0], K[2 * i + 4], K[2 * i + 5]);
-        D_copy[0] = circularShiftsL(D[0], 13);
-        D_copy[1] = D[1] ^ y3;
-        D_copy[2] = (D[2] - y2 + mod) % mod;
-        D_copy[3] = (D[3] - y1 + mod) % mod;
-
-        std::tie(y1, y2, y3) = E_function(D_copy[1], K[2 * i + 4], K[2 * i + 5]);
-        D[3] = D_copy[2] ^ y3;
-        D[2] = (D_copy[3] - y2 + mod) % mod;
-        D[1] = (D_copy[0] - y1 + mod) % mod;
-        D[0] = circularShiftsL(D_copy[1], 13);
-    }
-
-    backwardsMixing();
-
-
-    return D;
+    return this->D;
 }
+
+std::vector<DWORD> MARS::getRandomKey() {
+    std::mt19937 gen(static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count()));
+    std::uniform_int_distribution unfLen(4, 14);
+    std::uniform_int_distribution unfNum(0, 2147483647);
+
+    std::vector<DWORD> key;
+    int len = unfLen(gen);
+    for (int i = 0; i < len; i++)
+        key.push_back(unfNum(gen));
+
+    return key;
+}
+
+
