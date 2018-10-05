@@ -9,7 +9,7 @@
 #include <lcms.h>
 #include <vector>
 
-class MARS {
+class MARS2 {
 private:
     std::array<DWORD, 4> D;
     std::array<DWORD, 40> K{};
@@ -25,9 +25,13 @@ private:
 
     void keyExpansion(const std::vector<DWORD> &key);
 
-    DWORD circularShiftsR(const DWORD &D, const size_t &count);
+    void f_mix(DWORD &a, DWORD &b, DWORD &c, DWORD &d);
 
-    DWORD circularShiftsL(const DWORD &D, const size_t &count);
+    void b_mix(DWORD &a, DWORD &b, DWORD &c, DWORD &d);
+
+    void f_ktr(DWORD &a, DWORD &b, DWORD &c, DWORD &d, int i);
+
+    void r_ktr(DWORD &a, DWORD &b, DWORD &c, DWORD &d, int i);
 
 
     void forwardMixing();
@@ -47,7 +51,7 @@ private:
     void backwardsMixingDecryption();
 
 public:
-    explicit MARS();
+    explicit MARS2();
 
     std::array<DWORD, 4> getCiphertext(const std::vector<DWORD> &D, const std::vector<DWORD> &key);
 

@@ -9,10 +9,14 @@
 #include <algorithm>
 #include <random>
 #include <chrono>
+#include <x86intrin.h>
 
 #include "MARS.h"
 
-MARS::MARS() {
+#define rotr(x, n) _lrotr(x,n)
+#define rotl(x, n) _lrotl(x,n)
+
+MARS2::MARS2() {
     auto init = std::initializer_list<DWORD>({
                                                      0x09d0c479, 0x28c8ffe0, 0x84aa6c39, 0x9dad7287,
                                                      0x7dff9be3, 0xd4268361, 0xc96da1d4, 0x7974cc93,
@@ -78,6 +82,7 @@ MARS::MARS() {
                                                      0x7dead57b, 0x8d7ba426, 0x4cf5178a, 0x551a7cca,
                                                      0x1a9a5f08, 0xfcd651b9, 0x25605182, 0xe11fc6c3,
                                                      0xb6fd9676, 0x337b3027, 0xb7c8eb14, 0x9e5fd030,
+
                                                      0x6b57e354, 0xad913cf7, 0x7e16688d, 0x58872a69,
                                                      0x2c2fc7df, 0xe389ccc6, 0x30738df1, 0x0824a734,
                                                      0xe1797a8b, 0xa4a8d57b, 0x5b5d193b, 0xc8a8309b,
@@ -150,7 +155,7 @@ MARS::MARS() {
     mod = 4294967296; // 2^32
 }
 
-DWORD MARS::makeMask(const DWORD &w) {
+DWORD MARS2::makeMask(const DWORD &w) {
     // TODO: упростить
     auto binary = std::bitset<32>(w);
     std::string mask_str;
@@ -194,7 +199,7 @@ DWORD MARS::makeMask(const DWORD &w) {
     return mask_binary.to_ulong();
 }
 
-void MARS::keyExpansion(const std::vector<DWORD> &key) {
+void MARS2::keyExpansion(const std::vector<DWORD> &key) {
     std::array<DWORD, 15> T{};
     std::copy(key.begin(), key.end(), K.begin());
     std::copy(key.begin(), key.end(), T.begin());
@@ -202,11 +207,10 @@ void MARS::keyExpansion(const std::vector<DWORD> &key) {
 
     for (int j = 0; j < 4; j++) {
         for (int i = 0; i < 15; i++) {
-            // fixme: вправо или влево?
-            T[i] = T[i] ^ circularShiftsL(T[(i + 8) % 15] ^ T[(i + 13) % 15], 3) ^ (4 * i + j);
+            T[i] = T[i] ^ rotl(T[(i + 8) % 15] ^ T[(i + 13) % 15], 3) ^ (4 * i + j);
         }
         for (int i = 0; i < 15; i++) {
-            T[i] = circularShiftsL(T[i] + S[511 & T[(i + 14) % 15]], 9);
+            T[i] = rotl(T[i] + S[511 & T[(i + 14) % 15]], 9);
         }
         for (int i = 0; i < 10; i++) {
             K[10 * j + i] = T[(4 * i) % 15];
@@ -221,28 +225,20 @@ void MARS::keyExpansion(const std::vector<DWORD> &key) {
         DWORD w = K[i] | 3;
 
         DWORD M = makeMask(w);
-        DWORD p = circularShiftsL(B[j], 31 & K[i - 1]);
+        DWORD p = rotl(B[j], 31 & K[i - 1]);
         K[i] = w ^ (p & M);
     }
 }
 
-DWORD MARS::circularShiftsR(const DWORD &D, const size_t &count) {
-    return D >> count | D << (32 - count);
-}
 
-DWORD MARS::circularShiftsL(const DWORD &D, const size_t &count) {
-    return D << count | D >> (32 - count);
-}
-
-
-void MARS::forwardMixingDecryption() {
+void MARS2::forwardMixingDecryption() {
     for (int i = 0; i < 4; i++)
         D[i] = (D[i] + K[36 + i]) % mod;
 
     for (int i = 7; i >= 0; i--) {
         std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
 
-        D[0] = circularShiftsR(D[0], 24);
+        D[0] = rotr(D[0], 24);
 
         auto b = reinterpret_cast<BYTE *>(&D[0]);
         D[3] = D[3] ^ S0[b[1]];
@@ -259,25 +255,25 @@ void MARS::forwardMixingDecryption() {
     }
 }
 
-void MARS::forwardMixing() {
+void MARS2::forwardMixing() {
     for (int i = 0; i < 4; i++)
-        D[i] = (D[i] + K[i]) % mod;
+        D[i] = D[i] + K[i];
 
     for (int i = 0; i < 8; i++) {
         auto b = reinterpret_cast<BYTE *>(&D[0]);
 
         D[1] = D[1] ^ S0[b[0]];
-        D[1] = (D[1] + S1[b[1]]) % mod;
-        D[2] = (D[2] + S0[b[2]]) % mod;
-        D[3] = D[3] ^ S1[b[3]];
+        D[1] = (D[1] + S1[b[1]]);
+        D[2] = (D[2] + S0[b[2]]);
+        D[3] = D[3] ^ S1[(D[0] >> 24) & 255];
 
-        D[0] = circularShiftsR(D[0], 24);
+        D[0] = rotr(D[0], 24);
 
         if (i == 0 or i == 4) {
-            D[0] = (D[0] + D[3]) % mod;
+            D[0] = (D[0] + D[3]);
         }
         if (i == 1 or i == 5) {
-            D[0] = (D[0] + D[1]) % mod;
+            D[0] = (D[0] + D[1]);
         }
 
         std::rotate(D.begin(), D.begin() + 1, D.end());
@@ -285,30 +281,30 @@ void MARS::forwardMixing() {
 }
 
 
-std::tuple<DWORD, DWORD, DWORD> MARS::E_function(const DWORD &D, const DWORD &key1, const DWORD &key2) {
+std::tuple<DWORD, DWORD, DWORD> MARS2::E_function(const DWORD &D, const DWORD &key1, const DWORD &key2) {
     DWORD y1;
     DWORD y2;
     DWORD y3;
 
     y2 = (D + key1) % mod;
-    y3 = (circularShiftsL(D, 13) * key2) % mod;
+    y3 = (rotl(D, 13) * key2) % mod;
     y1 = S[511 & y2];
-    y3 = circularShiftsL(y3, 5);
-    y2 = circularShiftsL(y2, 31 & y3);
+    y3 = rotl(y3, 5);
+    y2 = rotl(y2, 31 & y3);
     y1 = y1 ^ y3;
-    y3 = circularShiftsL(y3, 5);
+    y3 = rotl(y3, 5);
     y1 = y1 ^ y3;
-    y1 = circularShiftsL(y1, 31 & y3);
+    y1 = rotl(y1, 31 & y3);
 
     return {y1, y2, y3};
 }
 
 
-void MARS::cryptographicCoreDecryption() {
+void MARS2::cryptographicCoreDecryption() {
     for (int i = 15; i >= 0; i--) {
         std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
 
-        D[0] = circularShiftsR(D[0], 13);
+        D[0] = rotr(D[0], 13);
 
         auto[y1, y2, y3] = E_function(D[0], K[2 * i + 4], K[2 * i + 5]);
         D[2] = (D[2] - y2 + mod) % mod;
@@ -322,10 +318,10 @@ void MARS::cryptographicCoreDecryption() {
     }
 }
 
-void MARS::cryptographicCore() {
+void MARS2::cryptographicCore() {
     for (int i = 0; i < 16; i++) {
         auto[y1, y2, y3] = E_function(D[0], K[2 * i + 4], K[2 * i + 5]);
-        D[0] = circularShiftsL(D[0], 13);
+        D[0] = rotl(D[0], 13);
         D[2] = (D[2] + y2) % mod;
         if (i < 8) {
             D[1] = (D[1] + y1) % mod;
@@ -340,7 +336,7 @@ void MARS::cryptographicCore() {
 }
 
 
-void MARS::backwardsMixingDecryption() {
+void MARS2::backwardsMixingDecryption() {
     for (int i = 7; i >= 0; i--) {
         std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
 
@@ -351,7 +347,7 @@ void MARS::backwardsMixingDecryption() {
             D[0] = (D[0] - D[1] + mod) % mod;
         }
 
-        D[0] = circularShiftsL(D[0], 24);
+        D[0] = rotl(D[0], 24);
 
         BYTE *b = reinterpret_cast<BYTE *>(&D[0]);
         D[3] = D[3] ^ S1[b[3]];
@@ -364,7 +360,7 @@ void MARS::backwardsMixingDecryption() {
         D[i] = (D[i] - K[i] + mod) % mod;
 }
 
-void MARS::backwardsMixing() {
+void MARS2::backwardsMixing() {
     for (int i = 0; i < 8; i++) {
         if (i == 2 or i == 6) {
             D[0] = (D[0] - D[3] + mod) % mod;
@@ -379,7 +375,7 @@ void MARS::backwardsMixing() {
         D[3] = (D[3] - S1[b[2]] + mod) % mod;
         D[3] = D[3] ^ S0[b[1]];
 
-        D[0] = circularShiftsL(D[0], 24);
+        D[0] = rotl(D[0], 24);
 
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
@@ -389,7 +385,7 @@ void MARS::backwardsMixing() {
 }
 
 
-std::array<DWORD, 4> MARS::getCiphertext(const std::vector<DWORD> &D, const std::vector<DWORD> &key) {
+std::array<DWORD, 4> MARS2::getCiphertext(const std::vector<DWORD> &D, const std::vector<DWORD> &key) {
     std::copy(D.begin(), D.end(), this->D.begin());
     keyExpansion(key);
 
@@ -400,7 +396,7 @@ std::array<DWORD, 4> MARS::getCiphertext(const std::vector<DWORD> &D, const std:
     return this->D;
 }
 
-std::array<DWORD, 4> MARS::getPlaintext(const std::vector<DWORD> &D, const std::vector<DWORD> &key) {
+std::array<DWORD, 4> MARS2::getPlaintext(const std::vector<DWORD> &D, const std::vector<DWORD> &key) {
     std::copy(D.begin(), D.end(), this->D.begin());
     keyExpansion(key);
 
@@ -411,7 +407,7 @@ std::array<DWORD, 4> MARS::getPlaintext(const std::vector<DWORD> &D, const std::
     return this->D;
 }
 
-std::vector<DWORD> MARS::getRandomKey() {
+std::vector<DWORD> MARS2::getRandomKey() {
     std::mt19937 gen(static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count()));
     std::uniform_int_distribution unfLen(4, 14);
     std::uniform_int_distribution unfNum(0, 2147483647);
@@ -423,5 +419,3 @@ std::vector<DWORD> MARS::getRandomKey() {
 
     return key;
 }
-
-
