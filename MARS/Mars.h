@@ -1,7 +1,3 @@
-//
-// Created by maxim on 02/10/18.
-//
-
 #ifndef LAB_2_MARS_H
 #define LAB_2_MARS_H
 
