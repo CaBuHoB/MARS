@@ -5,9 +5,9 @@ MARS is a shared-key block cipher, with a block size of 128 bits and a variable 
 ## Quick Start
 
     int main() {
-        std::string message = "MARS - a candidate cipher for AES. "
-                                                 "MARS is a shared-key block cipher, with a block size of 128 bits and "
-                                                 "a variable key size, ranging from 128 to over 400 bits.";
+        std::string message =   "MARS - a candidate cipher for AES. "
+                                "MARS is a shared-key block cipher, with a block size of 128 bits and "
+                                "a variable key size, ranging from 128 to over 400 bits.";
         ...
     }
 
