@@ -7,6 +7,8 @@
 #include <tuple>
 #include <random>
 #include <chrono>
+#include <algorithm>
+#include <iostream>
 #include "Mars.h"
 
 
@@ -180,7 +182,6 @@ void MARS::setKey(const std::vector<DWORD> &key) {
 }
 
 DWORD MARS::makeMask(DWORD x) {
-    x = 536805387;
     DWORD m;
 
     /* if m{bn} stands for bit number bn of m, set m{bn} = 1 if */
@@ -321,123 +322,92 @@ void MARS::r_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i) {
 std::array<DWORD, 4> MARS::encrypt(const std::array<DWORD, 4> &inBlock, const std::vector<DWORD> &key) {
     setKey(key);
 
-    DWORD a, b, c, d;
+    std::array<DWORD, 4> D{};
+    for(int i=0 ; i < 4; ++i)
+        D[i] = inBlock[i] + K[i];
 
-    a = inBlock[0] + K[0];
-    b = inBlock[1] + K[1];
-    c = inBlock[2] + K[2];
-    d = inBlock[3] + K[3];
+    for (int i = 0; i < 8; ++i) {
+        f_mix(D[0], D[1], D[2], D[3]);
+        if (i == 0 or i == 4)
+            D[0] += D[3];
+        if (i == 1 or i == 5)
+            D[0] += D[1];
+        std::rotate(D.begin(), D.begin() + 1, D.end());
+    }
 
-    f_mix(a, b, c, d);
-    a += d;
-    f_mix(b, c, d, a);
-    b += c;
-    f_mix(c, d, a, b);
-    f_mix(d, a, b, c);
-    f_mix(a, b, c, d);
-    a += d;
-    f_mix(b, c, d, a);
-    b += c;
-    f_mix(c, d, a, b);
-    f_mix(d, a, b, c);
+    for(DWORD i = 0; i < 16; ++i){
+        f_trans(D[0], D[1], D[2], D[3], (4 + (i * 2)));
+        if(i < 8)
+            std::rotate(D.begin(), D.begin() + 1, D.end());
+        else
+            std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
 
-    f_trans(a, b, c, d, 4);
-    f_trans(b, c, d, a, 6);
-    f_trans(c, d, a, b, 8);
-    f_trans(d, a, b, c, 10);
-    f_trans(a, b, c, d, 12);
-    f_trans(b, c, d, a, 14);
-    f_trans(c, d, a, b, 16);
-    f_trans(d, a, b, c, 18);
-    f_trans(a, d, c, b, 20);
-    f_trans(b, a, d, c, 22);
-    f_trans(c, b, a, d, 24);
-    f_trans(d, c, b, a, 26);
-    f_trans(a, d, c, b, 28);
-    f_trans(b, a, d, c, 30);
-    f_trans(c, b, a, d, 32);
-    f_trans(d, c, b, a, 34);
+        if (i == 7)
+            std::swap(D[1], D[3]);
+        if (i == 15)
+            std::swap(D[1], D[3]);
+    }
 
-    b_mix(a, b, c, d);
-    b_mix(b, c, d, a);
-    c -= b;
-    b_mix(c, d, a, b);
-    d -= a;
-    b_mix(d, a, b, c);
-    b_mix(a, b, c, d);
-    b_mix(b, c, d, a);
-    c -= b;
-    b_mix(c, d, a, b);
-    d -= a;
-    b_mix(d, a, b, c);
+    for (int i = 0; i < 8; ++i) {
+        b_mix(D[0], D[1], D[2], D[3]);
+        if (i == 1 or i == 5)
+            D[1] -= D[0];
+        if (i == 2 or i == 6)
+            D[1] -= D[2];
 
-    a = a - K[36];
-    b = b - K[37];
-    c = c - K[38];
-    d = d - K[39];
+        std::rotate(D.begin(), D.begin() + 1, D.end());
+    }
 
-    return {a, b, c, d};
+    for(int i=0; i < 4; ++i)
+        D[i] = D[i] - K[i + 36];
+
+    return D;
 }
 
 std::array<DWORD, 4> MARS::decrypt(const std::array<DWORD, 4> &inBlock, const std::vector<DWORD> &key) {
     setKey(key);
 
-    DWORD a, b, c, d;
+    std::array<DWORD, 4> D{};
+    for(int i=0 ; i < 4; ++i)
+        D[3 - i] = inBlock[i] + K[i + 36];
 
-    d = inBlock[0] + K[36];
-    c = inBlock[1] + K[37];
-    b = inBlock[2] + K[38];
-    a = inBlock[3] + K[39];
+    for (int i = 0; i < 8; ++i) {
+        f_mix(D[0], D[1], D[2], D[3]);
+        if (i == 0 or i == 4)
+            D[0] += D[3];
+        if (i == 1 or i == 5)
+            D[0] += D[1];
+        std::rotate(D.begin(), D.begin() + 1, D.end());
+    }
 
-    f_mix(a, b, c, d);
-    a += d;
-    f_mix(b, c, d, a);
-    b += c;
-    f_mix(c, d, a, b);
-    f_mix(d, a, b, c);
-    f_mix(a, b, c, d);
-    a += d;
-    f_mix(b, c, d, a);
-    b += c;
-    f_mix(c, d, a, b);
-    f_mix(d, a, b, c);
+    for(DWORD i = 0; i < 16; ++i){
+        r_trans(D[0], D[1], D[2], D[3], (34 - (i * 2)));
+        if(i < 8)
+            std::rotate(D.begin(), D.begin() + 1, D.end());
+        else
+            std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
 
-    r_trans(a, b, c, d, 34);
-    r_trans(b, c, d, a, 32);
-    r_trans(c, d, a, b, 30);
-    r_trans(d, a, b, c, 28);
-    r_trans(a, b, c, d, 26);
-    r_trans(b, c, d, a, 24);
-    r_trans(c, d, a, b, 22);
-    r_trans(d, a, b, c, 20);
-    r_trans(a, d, c, b, 18);
-    r_trans(b, a, d, c, 16);
-    r_trans(c, b, a, d, 14);
-    r_trans(d, c, b, a, 12);
-    r_trans(a, d, c, b, 10);
-    r_trans(b, a, d, c, 8);
-    r_trans(c, b, a, d, 6);
-    r_trans(d, c, b, a, 4);
+        if (i == 7)
+            std::swap(D[1], D[3]);
+        if (i == 15)
+            std::swap(D[1], D[3]);
+    }
 
-    b_mix(a, b, c, d);
-    b_mix(b, c, d, a);
-    c -= b;
-    b_mix(c, d, a, b);
-    d -= a;
-    b_mix(d, a, b, c);
-    b_mix(a, b, c, d);
-    b_mix(b, c, d, a);
-    c -= b;
-    b_mix(c, d, a, b);
-    d -= a;
-    b_mix(d, a, b, c);
+    for (int i = 0; i < 8; ++i) {
+        b_mix(D[0], D[1], D[2], D[3]);
+        if (i == 1 or i == 5)
+            D[1] -= D[0];
+        if (i == 2 or i == 6)
+            D[1] -= D[2];
 
-    DWORD D0 = d - K[0];
-    DWORD D1 = c - K[1];
-    DWORD D2 = b - K[2];
-    DWORD D3 = a - K[3];
+        std::rotate(D.begin(), D.begin() + 1, D.end());
+    }
 
-    return {D0, D1, D2, D3};
+    for(int i=0 ; i < 4; ++i)
+        D[i] = D[i] - K[3 - i];
+    std::reverse(D.begin(), D.end());
+
+    return D;
 }
 
 std::vector<DWORD> MARS::getRandomKey() {
