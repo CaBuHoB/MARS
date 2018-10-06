@@ -3,4 +3,4 @@ project(Lab_2)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(Lab_2 MARS/MARS.cpp MARS/MARS.h MARS/Mars.h MARS/Mars.cpp main.cpp)
+add_executable(Lab_2 MARS/Mars.h MARS/Mars.cpp main.cpp)

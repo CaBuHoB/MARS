@@ -16,7 +16,7 @@ private:
 
     void setKey(const std::vector<DWORD> &key);
 
-    std::tuple<DWORD, DWORD, DWORD> e_func(const DWORD &D, const DWORD &key1, const DWORD &key2);
+    std::tuple<DWORD, DWORD, DWORD> e_func(const DWORD &in, const DWORD &key1, const DWORD &key2);
 
     void f_mix(DWORD &a, DWORD &b, DWORD &c, DWORD &d);
 

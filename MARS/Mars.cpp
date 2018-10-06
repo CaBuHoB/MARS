@@ -7,8 +7,8 @@
 #include <tuple>
 #include <random>
 #include <chrono>
-#include <algorithm>
 #include <iostream>
+#include <algorithm>
 #include "Mars.h"
 
 
@@ -182,93 +182,68 @@ void MARS::setKey(const std::vector<DWORD> &key) {
 }
 
 DWORD MARS::makeMask(DWORD x) {
-    DWORD m;
+        // TODO: упростить
+    auto binary = std::bitset<32>(x);
+    std::string mask_str;
 
-    /* if m{bn} stands for bit number bn of m, set m{bn} = 1 if */
-    /* x{bn} == x{bn+1} for 0 <= bn <= 30.  That is, set a bit  */
-    /* in m if the corresponding bit and the next higher bit in */
-    /* x are equal in value (set m{31} = 0).                    */
+    int count = 0;
+    bool bit = false;
+    for (int ind = 31; ind >= 0; ind--) {
+        if (count == 0) {
+            bit = binary[ind];
+            count++;
+        } else if (bit != binary[ind]) {
+            if (count >= 10) {
+                mask_str += std::string(static_cast<unsigned long>(count), '1');
+            } else {
+                mask_str += std::string(static_cast<unsigned long>(count), '0');
+            }
+            count = 1;
+            bit = binary[ind];
+        } else {
+            count++;
+        }
+        if (ind == 0) {
+            if (count >= 10) {
+                mask_str += std::string(static_cast<unsigned long>(count), '1');
+            } else {
+                mask_str += std::string(static_cast<unsigned long>(count), '0');
+            }
+        }
+    }
 
-    m = (~x ^ (x >> 1)) & 0x7fffffff;
+    auto mask_binary = std::bitset<32>(mask_str);
+    mask_binary[31] = false;
+    mask_binary[30] = false;
+    mask_binary[0] = false;
 
-    /* Sequences of 9 '1' bits in m now correspond to sequences */
-    /* of 10 '0's or 10 '1' bits in x.  Shift and 'and' bits in */
-    /* m to find sequences of 9 or more '1' bits.   As a result */
-    /* bits in m are set if they are at the bottom of sequences */
-    /* of 10 adjacent '0's or 10 adjacent '1's in x.            */
+    for (int ind = 30; ind >= 0; ind--) {
+        if (binary[ind] != binary[ind + 1] or binary[ind] != binary[ind - 1])
+            mask_binary[ind] = false;
+    }
 
-    m &= (m >> 1) & (m >> 2);
-    m &= (m >> 3) & (m >> 6);
-
-    if (!m)  /* return if mask is empty - no key fixing needed   */
-        /* is this early return worthwhile?                 */
-        return 0;
-
-    /* We need the internal bits in each continuous sequence of */
-    /* matching bits (that is the bits less the two endpoints). */
-    /* We thus propagate each set bit into the 8 internal bits  */
-    /* that it represents, starting 1 left and finsihing 8 left */
-    /* of its position.                                         */
-
-    m <<= 1;
-    m |= (m << 1);
-    m |= (m << 2);
-    m |= (m << 4);
-
-    /* m is now correct except for the odd behaviour of bit 31, */
-    /* that is, it will be set if it is in a sequence of 10 or  */
-    /* more '0's and clear otherwise.                           */
-
-    m |= (m << 1) & ~x & 0x80000000;
-
-    return m & 0xfffffffc;
-
-
-    // TODO: упростить
-//    auto binary = std::bitset<32>(x);
-//    std::string mask_str;
-//
-//    int count = 0;
-//    bool bit = false;
-//    for (int ind = 31; ind >= 0; ind--) {
-//        if (count == 0) {
-//            bit = binary[ind];
-//            count++;
-//        } else if (bit != binary[ind]) {
-//            if (count >= 10) {
-//                mask_str += std::string(static_cast<unsigned long>(count), '1');
-//            } else {
-//                mask_str += std::string(static_cast<unsigned long>(count), '0');
-//            }
-//            count = 1;
-//            bit = binary[ind];
-//        } else {
-//            count++;
-//        }
-//        if (ind == 0) {
-//            if (count >= 10) {
-//                mask_str += std::string(static_cast<unsigned long>(count), '1');
-//            } else {
-//                mask_str += std::string(static_cast<unsigned long>(count), '0');
-//            }
-//        }
-//    }
-//
-//    auto mask_binary = std::bitset<32>(mask_str);
-//    mask_binary[31] = false;
-//    mask_binary[30] = false;
-//    mask_binary[0] = false;
-//
-//    for (int ind = 30; ind >= 0; ind--) {
-//        if (binary[ind] != binary[ind + 1] or binary[ind] != binary[ind - 1])
-//            mask_binary[ind] = false;
-//    }
-//
-//    return mask_binary.to_ulong();
+    return mask_binary.to_ulong();
 }
 
-std::tuple<DWORD, DWORD, DWORD> MARS::e_func(const DWORD &D, const DWORD &key1, const DWORD &key2) {
-    return std::tuple<DWORD, DWORD, DWORD>();
+std::tuple<DWORD, DWORD, DWORD> MARS::e_func(const DWORD &in, const DWORD &key1, const DWORD &key2) {
+    DWORD L;
+    DWORD M;
+    DWORD R;
+
+    M = in + key1;
+    R = rotl(in, 13) * key2;
+    DWORD i = 511 & M;
+    L = S[i];
+    R = rotl(R, 5);
+    DWORD r = 31 & R;
+    M = rotl(M, r);
+    L = L ^ R;
+    R = rotl(R, 5);
+    L = L ^ R;
+    r = 31 & R;
+    L = rotl(L, r);
+
+    return {L, M, R};
 }
 
 void MARS::f_mix(DWORD &a, DWORD &b, DWORD &c, DWORD &d) {
@@ -292,38 +267,26 @@ void MARS::b_mix(DWORD &a, DWORD &b, DWORD &c, DWORD &d) {
 }
 
 void MARS::f_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i) {
-    DWORD m = a + K[i];
+    auto[out1, out2, out3] = e_func(a, K[2 * i + 4], K[2 * i + 5]);
     a = rotl(a, 13);
-    DWORD r = a * K[i + 1];
-    DWORD l = S[m & 511];
-    r = rotl(r, 5);
-    c += rotl(m, r);
-    l ^= r;
-    r = rotl(r, 5);
-    l ^= r;
-    d ^= r;
-    b += rotl(l, r);
+    c = c + out2;
+    b = b + out1;
+    d = d ^ out3;
 }
 
 void MARS::r_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i) {
-    DWORD r = a * K[i + 1];
     a = rotr(a, 13);
-    DWORD m = a + K[i];
-    DWORD l = S[m & 511];
-    r = rotl(r, 5);
-    l ^= r;
-    c -= rotl(m, r);
-    r = rotl(r, 5);
-    l ^= r;
-    d ^= r;
-    b -= rotl(l, r);
+    auto[out1, out2, out3] = e_func(a, K[2 * i + 4], K[2 * i + 5]);
+    c = c - out2;
+    b = b - out1;
+    d = d ^ out3;
 }
 
 std::array<DWORD, 4> MARS::encrypt(const std::array<DWORD, 4> &inBlock, const std::vector<DWORD> &key) {
     setKey(key);
 
     std::array<DWORD, 4> D{};
-    for(int i=0 ; i < 4; ++i)
+    for (int i = 0; i < 4; ++i)
         D[i] = inBlock[i] + K[i];
 
     for (int i = 0; i < 8; ++i) {
@@ -335,9 +298,9 @@ std::array<DWORD, 4> MARS::encrypt(const std::array<DWORD, 4> &inBlock, const st
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
 
-    for(DWORD i = 0; i < 16; ++i){
-        f_trans(D[0], D[1], D[2], D[3], (4 + (i * 2)));
-        if(i < 8)
+    for (DWORD i = 0; i < 16; ++i) {
+        f_trans(D[0], D[1], D[2], D[3], i);
+        if (i < 8)
             std::rotate(D.begin(), D.begin() + 1, D.end());
         else
             std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
@@ -358,7 +321,7 @@ std::array<DWORD, 4> MARS::encrypt(const std::array<DWORD, 4> &inBlock, const st
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
 
-    for(int i=0; i < 4; ++i)
+    for (int i = 0; i < 4; ++i)
         D[i] = D[i] - K[i + 36];
 
     return D;
@@ -368,7 +331,7 @@ std::array<DWORD, 4> MARS::decrypt(const std::array<DWORD, 4> &inBlock, const st
     setKey(key);
 
     std::array<DWORD, 4> D{};
-    for(int i=0 ; i < 4; ++i)
+    for (int i = 0; i < 4; ++i)
         D[3 - i] = inBlock[i] + K[i + 36];
 
     for (int i = 0; i < 8; ++i) {
@@ -380,9 +343,9 @@ std::array<DWORD, 4> MARS::decrypt(const std::array<DWORD, 4> &inBlock, const st
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
 
-    for(DWORD i = 0; i < 16; ++i){
-        r_trans(D[0], D[1], D[2], D[3], (34 - (i * 2)));
-        if(i < 8)
+    for (DWORD i = 0; i < 16; ++i) {
+        r_trans(D[0], D[1], D[2], D[3], 15 - i);
+        if (i < 8)
             std::rotate(D.begin(), D.begin() + 1, D.end());
         else
             std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
@@ -403,7 +366,7 @@ std::array<DWORD, 4> MARS::decrypt(const std::array<DWORD, 4> &inBlock, const st
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
 
-    for(int i=0 ; i < 4; ++i)
+    for (int i = 0; i < 4; ++i)
         D[i] = D[i] - K[3 - i];
     std::reverse(D.begin(), D.end());
 

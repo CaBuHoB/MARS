@@ -35,7 +35,7 @@ std::string masDWORDtoString(const std::vector<DWORD> &arr) {
 }
 
 int main() {
-    std::string message = "Hello, world! My name is max, maybe i can help you?";
+    std::string message = "Hello, world!";
     auto arr = stringToDWORDmas(message);
     std::cout << "Original: " << message << "\n";
 
