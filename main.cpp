@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <iterator>
+#include <bitset>
 #include "MARS/Mars.h"
 
 std::vector<DWORD> stringToDWORDmas(const std::string &str) {
@@ -34,8 +35,64 @@ std::string masDWORDtoString(const std::vector<DWORD> &arr) {
     return str;
 }
 
+std::string getBits(const std::vector<DWORD> &arr){
+    std::string arrBits;
+    for(const auto dword : arr){
+        std::bitset<32> bits (dword);
+        arrBits += bits.to_string();
+    }
+
+    return arrBits;
+}
+
+void distribution(const std::vector<DWORD> &encrypt){
+    std::string encBits = getBits(encrypt);
+
+    DWORD col = 0;
+    for(auto bit : encBits) {
+        if (bit == '0')
+            col++;
+    }
+    std::cout << "Number of zeros: " << col << " " << col * 1.0 / encBits.length() * 100 << "%\n";
+    std::cout << "Number of units: " << encBits.length() - col << " ";
+    std::cout << (encBits.length() - col) * 1.0 / encBits.length() * 100 << "%\n";
+}
+
+void corrCoef (const std::vector<DWORD> &encrypt, const std::vector<DWORD> &decrypt){
+    std::string encBits = getBits(encrypt);
+    std::string decBits = getBits(decrypt);
+
+    double _x = 0;
+    for(const auto bit : encBits)
+        _x += static_cast<DWORD> (bit);
+    _x /= encBits.length();
+
+    double _y = 0;
+    for(const auto bit : decBits)
+        _y += static_cast<DWORD> (bit);
+    _y /= decBits.length();
+
+    double numerator = 0;
+    for(int i=0; i< encBits.length();++i)
+        numerator += (static_cast<DWORD> (encBits[i]) - _x) * (static_cast<DWORD> (decBits[i]) - _y);
+
+    double denominator = 0;
+    double denominatorLeft = 0;
+    for (char encBit : encBits)
+        denominatorLeft += (static_cast<double> (encBit) - _x) * (static_cast<double> (encBit) - _x);
+    double denominatorRight = 0;
+    for (char decBit : decBits)
+        denominatorRight += (static_cast<double> (decBit) - _y) * (static_cast<double> (decBit) - _y);
+    denominator = sqrt(denominatorLeft * denominatorRight);
+
+    double r = numerator / denominator;
+    std::cout << "\nCorrcoef: " << r << std::endl;
+}
+
 int main() {
-    std::string message = "Hello, world!";
+    std::string message = "MARS - a candidate cipher for AES. "
+                          "MARS is a shared-key block cipher, with a block size of 128 bits and "
+                          "a variable key size, ranging from 128 to over 400 bits.";
     auto arr = stringToDWORDmas(message);
     std::cout << "Original: " << message << "\n";
 
@@ -57,8 +114,11 @@ int main() {
         decrypt.insert(decrypt.end(), plaintext.begin(), plaintext.end());
     }
 
-    std::cout << "Ciphertext: " << masDWORDtoString(encrypt) << "\n";
-    std::cout << "Plaintext: " << masDWORDtoString(decrypt) << "\n";
+    std::cout << "\nCiphertext: " << masDWORDtoString(encrypt) << "\n";
+    distribution(encrypt);
+    std::cout << "\nPlaintext: " << masDWORDtoString(decrypt);
+
+    corrCoef(encrypt, decrypt);
 
     return 0;
 }

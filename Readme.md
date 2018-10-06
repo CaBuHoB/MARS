@@ -5,16 +5,39 @@ MARS is a shared-key block cipher, with a block size of 128 bits and a variable 
 ## Quick Start
 
     int main() {
-        std::string message = "Hello, world!";
+        std::string message = "MARS - a candidate cipher for AES. "
+                                                 "MARS is a shared-key block cipher, with a block size of 128 bits and "
+                                                 "a variable key size, ranging from 128 to over 400 bits.";
         ...
     }
 
-Variable "message" assign the message you want to encode. As a result of the program, you will receive a randomly generated key, chiphertext and a decoded message:
+Variable "message" assign the message you want to encode. As a result of the program, you will receive a randomly generated key, ciphertext with the distribution of "0" and "1", a decoded message and correlation coefficient for the input and output flow of the algorithm:
 
-    Original: Hello, world!
-    Key: 368540616 721753574 1088423854 1183147167 2065103748 1257566055 2121805365 1947632849
-    Ciphertext: ���_�2_GQW=����(
-    Plaintext: Hello, world!
+    Original: MARS - a candidate cipher for AES. MARS is a shared-key block cipher, with a block size of 128 bits and a variable key size, ranging from 128 to over 400 bits.
+    Key: 1287413327 504862387 152522607 782537283 907780779 1590089769 1842987796 1456145547 454841597 1199799222 1149427744 1606081808 865661574 87959568
+
+    Ciphertext: ?X��M�t��9�t)���K^�P�fC6)�������o �.zm0s�oOcS�}�*��W��e�Ť&X�999zhpW�!�ωINY����ʻi�%l��R��,H���7�.�z m.z?{�U�@�����.<E�a�&�X��*�qA%�Wp��O�sA
+    Number of zeros: 633 49.4531%
+    Number of units: 647 50.5469%
+
+    Plaintext: MARS - a candidate cipher for AES. MARS is a shared-key block cipher, with a block size of 128 bits and a variable key size, ranging from 128 to over 400 bits.
+    Corrcoef: 0.0129283
+
+If you want to enter your key, replace the line in main:
+
+    int main() {
+        ...
+        auto key = mars.getRandomKey();
+        ...
+    }
+
+The key must be between 4 and 14 32-bit words, for example:
+
+    int main() {
+        ...
+        std::vector<DWORD> key = {1, 2, 3, 4};
+        ...
+    }
 
 ## References
 - [MARS - a candidate cipher for AES](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.35.5604&rep=rep1&type=pdf).
