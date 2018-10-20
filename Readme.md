@@ -11,7 +11,7 @@ MARS is a shared-key block cipher, with a block size of 128 bits and a variable 
         ...
     }
 
-Variable "message" assign the message you want to encode. As a result of the program, you will receive a randomly generated key, ciphertext with the distribution of "0" and "1", a decoded message and correlation coefficient for the input and output flow of the algorithm:
+Variable "message" assign the message you want to encode. As a result of the program, you will receive a randomly generated key, ciphertext with the distribution of "0" and "1", a decoded message and [correlation coefficient](https://www.socscistatistics.com/tests/pearson/) for the input and output flow of the algorithm:
 
     Original: MARS - a candidate cipher for AES. MARS is a shared-key block cipher, with a block size of 128 bits and a variable key size, ranging from 128 to over 400 bits.
     Key: 1287413327 504862387 152522607 782537283 907780779 1590089769 1842987796 1456145547 454841597 1199799222 1149427744 1606081808 865661574 87959568

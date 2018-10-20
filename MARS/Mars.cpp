@@ -178,46 +178,47 @@ void MARS::setKey(const std::vector<DWORD> &key) {
 }
 
 DWORD MARS::makeMask(DWORD x) {
-    DWORD m;
+    // TODO: упростить
+    auto binary = std::bitset<32>(x);
+    std::string mask_str;
 
-    /* if m{bn} stands for bit number bn of m, set m{bn} = 1 if */
-    /* x{bn} == x{bn+1} for 0 <= bn <= 30.  That is, set a bit  */
-    /* in m if the corresponding bit and the next higher bit in */
-    /* x are equal in value (set m{31} = 0).                    */
+    int count = 0;
+    bool bit = false;
+    for (int ind = 31; ind >= 0; ind--) {
+        if (count == 0) {
+            bit = binary[ind];
+            count++;
+        } else if (bit != binary[ind]) {
+            if (count >= 10) {
+                mask_str += std::string(static_cast<unsigned long>(count), '1');
+            } else {
+                mask_str += std::string(static_cast<unsigned long>(count), '0');
+            }
+            count = 1;
+            bit = binary[ind];
+        } else {
+            count++;
+        }
+        if (ind == 0) {
+            if (count >= 10) {
+                mask_str += std::string(static_cast<unsigned long>(count), '1');
+            } else {
+                mask_str += std::string(static_cast<unsigned long>(count), '0');
+            }
+        }
+    }
 
-    m = (~x ^ (x >> 1)) & 0x7fffffff;
+    auto mask_binary = std::bitset<32>(mask_str);
+    mask_binary[31] = false;
+    mask_binary[30] = false;
+    mask_binary[0] = false;
 
-    /* Sequences of 9 '1' bits in m now correspond to sequences */
-    /* of 10 '0's or 10 '1' bits in x.  Shift and 'and' bits in */
-    /* m to find sequences of 9 or more '1' bits.   As a result */
-    /* bits in m are set if they are at the bottom of sequences */
-    /* of 10 adjacent '0's or 10 adjacent '1's in x.            */
+    for (int ind = 30; ind >= 0; ind--) {
+        if (binary[ind] != binary[ind + 1] or binary[ind] != binary[ind - 1])
+            mask_binary[ind] = false;
+    }
 
-    m &= (m >> 1) & (m >> 2);
-    m &= (m >> 3) & (m >> 6);
-
-    if (!m)  /* return if mask is empty - no key fixing needed   */
-        /* is this early return worthwhile?                 */
-        return 0;
-
-    /* We need the internal bits in each continuous sequence of */
-    /* matching bits (that is the bits less the two endpoints). */
-    /* We thus propagate each set bit into the 8 internal bits  */
-    /* that it represents, starting 1 left and finsihing 8 left */
-    /* of its position.                                         */
-
-    m <<= 1;
-    m |= (m << 1);
-    m |= (m << 2);
-    m |= (m << 4);
-
-    /* m is now correct except for the odd behaviour of bit 31, */
-    /* that is, it will be set if it is in a sequence of 10 or  */
-    /* more '0's and clear otherwise.                           */
-
-    m |= (m << 1) & ~x & 0x80000000;
-
-    return m & 0xfffffffc;
+    return mask_binary.to_ulong();
 }
 
 std::tuple<DWORD, DWORD, DWORD> MARS::e_func(const DWORD &in, const DWORD &key1, const DWORD &key2) {
@@ -369,9 +370,10 @@ std::array<DWORD, 4> MARS::decrypt(const std::array<DWORD, 4> &inBlock, const st
 }
 
 std::vector<DWORD> MARS::getRandomKey() {
-    std::mt19937 gen(static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count()));
+    std::random_device rd;
+    std::mt19937 gen(rd());
     std::uniform_int_distribution unfLen(4, 14);
-    std::uniform_int_distribution unfNum(0, 2147483647);
+    std::uniform_int_distribution<DWORD> unfNum(0, 4294967295);
 
     std::vector<DWORD> key;
     int len = unfLen(gen);
