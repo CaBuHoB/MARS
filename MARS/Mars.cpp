@@ -8,8 +8,8 @@
 #include "Mars.h"
 
 
-#define rotr(x, n) _lrotr(x,n)
-#define rotl(x, n) _lrotl(x,n)
+#define rotr(x, n) _rotr(x,n)
+#define rotl(x, n) _rotl(x,n)
 
 
 MARS::MARS() {
@@ -145,6 +145,7 @@ MARS::MARS() {
                                                      0xab561187, 0x14eea0f0, 0xdf0d4164, 0x19af70ee
                                              });
     std::copy(init.begin(), init.end(), S);
+    mod = 4294967296;
 }
 
 void MARS::setKey(const std::vector<DWORD> &key) {
@@ -155,10 +156,12 @@ void MARS::setKey(const std::vector<DWORD> &key) {
 
     for (int j = 0; j < 4; j++) {
         for (int i = 0; i < 15; i++) {
-            T[i] = T[i] ^ rotl(T[(i + 8) % 15] ^ T[(i + 13) % 15], 3) ^ (4 * i + j);
+            auto for_rot = static_cast<unsigned int>(T[(i + 8) % 15] ^ T[(i + 13) % 15]);
+            T[i] = T[i] ^ rotl(for_rot, 3) ^ (4 * i + j);
         }
         for (int i = 0; i < 15; i++) {
-            T[i] = rotl(T[i] + S[511 & T[(i + 14) % 15]], 9);
+            auto for_rot = static_cast<unsigned int>((T[i] + S[511 & T[(i + 14) % 15]]) % mod);
+            T[i] = rotl(for_rot, 9);
         }
         for (int i = 0; i < 10; i++) {
             K[10 * j + i] = T[(4 * i) % 15];
@@ -172,7 +175,8 @@ void MARS::setKey(const std::vector<DWORD> &key) {
         DWORD w = K[i] | 3;
 
         DWORD M = makeMask(w);
-        DWORD p = rotl(B[j], 31 & K[i - 1]);
+        auto for_rot = static_cast<unsigned int>(B[j]);
+        DWORD p = rotl(for_rot, 31 & K[i - 1]);
         K[i] = w ^ (p & M);
     }
 }
@@ -226,55 +230,64 @@ std::tuple<DWORD, DWORD, DWORD> MARS::e_func(const DWORD &in, const DWORD &key1,
     DWORD M;
     DWORD R;
 
-    M = in + key1;
-    R = rotl(in, 13) * key2;
+    M = (in + key1) % mod;
+    auto for_rot = static_cast<unsigned int>(in);
+    R = rotl(for_rot, 13) * key2;
     DWORD i = 511 & M;
     L = S[i];
-    R = rotl(R, 5);
+    for_rot = static_cast<unsigned int>(R);
+    R = rotl(for_rot, 5);
     DWORD r = 31 & R;
-    M = rotl(M, r);
+    for_rot = static_cast<unsigned int>(M);
+    M = rotl(for_rot, r);
     L = L ^ R;
-    R = rotl(R, 5);
+    for_rot = static_cast<unsigned int>(R);
+    R = rotl(for_rot, 5);
     L = L ^ R;
     r = 31 & R;
-    L = rotl(L, r);
+    for_rot = static_cast<unsigned int>(L);
+    L = rotl(for_rot, r);
 
     return {L, M, R};
 }
 
 void MARS::f_mix(DWORD &a, DWORD &b, DWORD &c, DWORD &d) {
-    DWORD r = rotr(a, 8);
+    auto for_rot = static_cast<unsigned int>(a);
+    DWORD r = rotr(for_rot, 8);
     b ^= S[a & 255];
-    b += S[(r & 255) + 256];
-    r = rotr(a, 16);
-    a = rotr(a, 24);
-    c += S[r & 255];
+    b = (b + S[(r & 255) + 256]) % mod;
+    r = rotr(for_rot, 16);
+    a = rotr(for_rot, 24);
+    c = (c + S[r & 255]) % mod;
     d ^= S[(a & 255) + 256];
 }
 
 void MARS::b_mix(DWORD &a, DWORD &b, DWORD &c, DWORD &d) {
-    DWORD r = rotl(a, 8);
+    auto for_rot = static_cast<unsigned int>(a);
+    DWORD r = rotl(for_rot, 8);
     b ^= S[(a & 255) + 256];
-    c -= S[r & 255];
-    r = rotl(a, 16);
-    a = rotl(a, 24);
-    d -= S[(r & 255) + 256];
+    c = (mod + c - S[r & 255]) % mod;
+    r = rotl(for_rot, 16);
+    a = rotl(for_rot, 24);
+    d = (mod + d - S[(r & 255) + 256]) % mod;
     d ^= S[a & 255];
 }
 
 void MARS::f_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i) {
     auto[out1, out2, out3] = e_func(a, K[2 * i + 4], K[2 * i + 5]);
-    a = rotl(a, 13);
-    c = c + out2;
-    b = b + out1;
+    auto for_rot = static_cast<unsigned int>(a);
+    a = rotl(for_rot, 13);
+    c = (c + out2) % mod;
+    b = (b + out1) % mod;
     d = d ^ out3;
 }
 
 void MARS::r_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i) {
-    a = rotr(a, 13);
+    auto for_rot = static_cast<unsigned int>(a);
+    a = rotl(for_rot, 13);
     auto[out1, out2, out3] = e_func(a, K[2 * i + 4], K[2 * i + 5]);
-    c = c - out2;
-    b = b - out1;
+    c = (mod + c - out2) % mod;
+    b = (mod + b - out1) % mod;
     d = d ^ out3;
 }
 
@@ -283,42 +296,42 @@ std::array<DWORD, 4> MARS::encrypt(const std::array<DWORD, 4> &inBlock, const st
 
     std::array<DWORD, 4> D{};
     for (int i = 0; i < 4; ++i)
-        D[i] = inBlock[i] + K[i];
+        D[i] = (inBlock[i] + K[i]) % mod;
 
     for (int i = 0; i < 8; ++i) {
         f_mix(D[0], D[1], D[2], D[3]);
         if (i == 0 or i == 4)
-            D[0] += D[3];
+            D[0] = (D[0] + D[3]) % mod;
         if (i == 1 or i == 5)
-            D[0] += D[1];
+            D[0] = (D[0] + D[1]) % mod;
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
 
-    for (DWORD i = 0; i < 16; ++i) {
-        f_trans(D[0], D[1], D[2], D[3], i);
-        if (i < 8)
-            std::rotate(D.begin(), D.begin() + 1, D.end());
-        else
-            std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
-
-        if (i == 7)
-            std::swap(D[1], D[3]);
-        if (i == 15)
-            std::swap(D[1], D[3]);
-    }
-
-    for (int i = 0; i < 8; ++i) {
-        b_mix(D[0], D[1], D[2], D[3]);
-        if (i == 1 or i == 5)
-            D[1] -= D[0];
-        if (i == 2 or i == 6)
-            D[1] -= D[2];
-
-        std::rotate(D.begin(), D.begin() + 1, D.end());
-    }
+//    for (DWORD i = 0; i < 16; ++i) {
+//        f_trans(D[0], D[1], D[2], D[3], i);
+//        if (i < 8)
+//            std::rotate(D.begin(), D.begin() + 1, D.end());
+//        else
+//            std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
+//
+//        if (i == 7)
+//            std::swap(D[1], D[3]);
+//        if (i == 15)
+//            std::swap(D[1], D[3]);
+//    }
+//
+//    for (int i = 0; i < 8; ++i) {
+//        b_mix(D[0], D[1], D[2], D[3]);
+//        if (i == 1 or i == 5)
+//            D[1] = (mod + D[1] - D[0]) % mod;
+//        if (i == 2 or i == 6)
+//            D[1] = (mod + D[1] - D[2]) % mod;
+//
+//        std::rotate(D.begin(), D.begin() + 1, D.end());
+//    }
 
     for (int i = 0; i < 4; ++i)
-        D[i] = D[i] - K[i + 36];
+        D[i] = (mod + D[i] - K[i + 36]) % mod;
 
     return D;
 }
@@ -328,42 +341,42 @@ std::array<DWORD, 4> MARS::decrypt(const std::array<DWORD, 4> &inBlock, const st
 
     std::array<DWORD, 4> D{};
     for (int i = 0; i < 4; ++i)
-        D[3 - i] = inBlock[i] + K[i + 36];
+        D[3 - i] = (inBlock[i] + K[i + 36]) % mod;
 
     for (int i = 0; i < 8; ++i) {
         f_mix(D[0], D[1], D[2], D[3]);
         if (i == 0 or i == 4)
-            D[0] += D[3];
+            D[0] = (D[0] + D[3]) % mod;
         if (i == 1 or i == 5)
-            D[0] += D[1];
+            D[0] = (D[0] + D[1]) % mod;
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
-
-    for (DWORD i = 0; i < 16; ++i) {
-        r_trans(D[0], D[1], D[2], D[3], 15 - i);
-        if (i < 8)
-            std::rotate(D.begin(), D.begin() + 1, D.end());
-        else
-            std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
-
-        if (i == 7)
-            std::swap(D[1], D[3]);
-        if (i == 15)
-            std::swap(D[1], D[3]);
-    }
-
-    for (int i = 0; i < 8; ++i) {
-        b_mix(D[0], D[1], D[2], D[3]);
-        if (i == 1 or i == 5)
-            D[1] -= D[0];
-        if (i == 2 or i == 6)
-            D[1] -= D[2];
-
-        std::rotate(D.begin(), D.begin() + 1, D.end());
-    }
+//
+//    for (DWORD i = 0; i < 16; ++i) {
+//        r_trans(D[0], D[1], D[2], D[3], 15 - i);
+//        if (i < 8)
+//            std::rotate(D.begin(), D.begin() + 1, D.end());
+//        else
+//            std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
+//
+//        if (i == 7)
+//            std::swap(D[1], D[3]);
+//        if (i == 15)
+//            std::swap(D[1], D[3]);
+//    }
+//
+//    for (int i = 0; i < 8; ++i) {
+//        b_mix(D[0], D[1], D[2], D[3]);
+//        if (i == 1 or i == 5)
+//            D[1] = (mod + D[1] - D[0]) % mod;
+//        if (i == 2 or i == 6)
+//            D[1] = (mod + D[1] - D[2]) % mod;
+//
+//        std::rotate(D.begin(), D.begin() + 1, D.end());
+//    }
 
     for (int i = 0; i < 4; ++i)
-        D[i] = D[i] - K[3 - i];
+        D[i] = (mod + D[i] - K[3 - i]) % mod;;
     std::reverse(D.begin(), D.end());
 
     return D;

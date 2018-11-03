@@ -1,9 +1,12 @@
 #include <iterator>
 #include <bitset>
 #include <vector>
-#include <lcms.h>
 #include <iostream>
 #include <fstream>
+#include <math.h>
+
+using DWORD = unsigned long;
+using BYTE = unsigned char;
 
 std::vector<unsigned> fileToDWORDmas(const std::string &filePath) {
     std::ifstream fs(filePath, std::ios_base::out | std::ios_base::binary);
@@ -36,7 +39,20 @@ void masDWORDtoFile(const std::string &filePath, const std::vector<DWORD> &arr) 
     std::copy(arr.begin(), arr.end(), arrCopy.begin());
     while (arrCopy.back() == 0)
         arrCopy.pop_back();
+    unsigned int back = arrCopy[arrCopy.size() - 1];
+    arrCopy.pop_back();
     fs.write(reinterpret_cast<const char *>(arrCopy.data()), arrCopy.size() * 4);
+
+    for (int i = 0; i < 4; i++) {
+        auto r = back >> (8 * i);
+        r &= 255;
+        if (r != 0) {
+            char backChar = static_cast<unsigned char>(r);
+            fs.write(&backChar, 1);
+        } else {
+            break;
+        }
+    }
 }
 
 std::vector<unsigned> stringToDWORDmas(const std::string &str) {

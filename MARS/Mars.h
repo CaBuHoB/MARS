@@ -1,14 +1,18 @@
 #ifndef LAB_2_MARS_H
 #define LAB_2_MARS_H
 
-#include <lcms.h>
 #include <array>
 #include <vector>
+
+using DWORD = unsigned long;
+using BYTE = unsigned char;
 
 class MARS {
 private:
     std::array<DWORD, 40> K{};
     DWORD S[512];
+
+    DWORD mod;
 
     void setKey(const std::vector<DWORD> &key);
 
