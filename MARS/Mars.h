@@ -9,12 +9,12 @@ using BYTE = unsigned char;
 
 class MARS {
 private:
-    std::array<DWORD, 40> K{};
+    std::array<DWORD , 40> K{};
     DWORD S[512];
 
     DWORD mod;
 
-    void setKey(const std::vector<DWORD> &key);
+    void setKey(const std::vector<unsigned> &key);
 
     std::tuple<DWORD, DWORD, DWORD> e_func(const DWORD &in, const DWORD &key1, const DWORD &key2);
 
@@ -31,11 +31,11 @@ private:
 public:
     MARS();
 
-    std::array<DWORD, 4> encrypt(const std::array<DWORD, 4> &inBlock, const std::vector<DWORD> &key);
+    std::array<DWORD, 4> encrypt(const std::array<unsigned, 4> &inBlock, const std::vector<unsigned> &key);
 
-    std::array<DWORD, 4> decrypt(const std::array<DWORD, 4> &inBlock, const std::vector<DWORD> &key);
+    std::array<DWORD, 4> decrypt(const std::array<unsigned, 4> &inBlock, const std::vector<unsigned> &key);
 
-    std::vector<DWORD> getRandomKey();
+    std::vector<unsigned> getRandomKey();
 
 };
 

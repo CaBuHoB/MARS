@@ -3,10 +3,8 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-#include <math.h>
+#include <cmath>
 
-using DWORD = unsigned long;
-using BYTE = unsigned char;
 
 std::vector<unsigned> fileToDWORDmas(const std::string &filePath) {
     std::ifstream fs(filePath, std::ios_base::out | std::ios_base::binary);
@@ -29,7 +27,7 @@ std::vector<unsigned> fileToDWORDmas(const std::string &filePath) {
     return arr;
 }
 
-void masDWORDtoFile(const std::string &filePath, const std::vector<DWORD> &arr) {
+void masDWORDtoFile(const std::string &filePath, const std::vector<unsigned> &arr, bool encrypted = false) {
     std::ofstream fs(filePath, std::ios_base::out | std::ios_base::binary);
     if (fs.fail()) {
         exit(1);
@@ -39,12 +37,19 @@ void masDWORDtoFile(const std::string &filePath, const std::vector<DWORD> &arr) 
     std::copy(arr.begin(), arr.end(), arrCopy.begin());
     while (arrCopy.back() == 0)
         arrCopy.pop_back();
+
+    if (encrypted) {
+        fs.write(reinterpret_cast<const char *>(arrCopy.data()), arrCopy.size() * 4);
+        return;
+    }
+
     unsigned int back = arrCopy[arrCopy.size() - 1];
     arrCopy.pop_back();
     fs.write(reinterpret_cast<const char *>(arrCopy.data()), arrCopy.size() * 4);
 
     for (int i = 0; i < 4; i++) {
-        auto r = back >> (8 * i);
+        int shift = 8 * i;
+        auto r = back >> shift;
         r &= 255;
         if (r != 0) {
             char backChar = static_cast<unsigned char>(r);
@@ -55,37 +60,7 @@ void masDWORDtoFile(const std::string &filePath, const std::vector<DWORD> &arr) 
     }
 }
 
-std::vector<unsigned> stringToDWORDmas(const std::string &str) {
-    std::vector<unsigned> arr;
-    unsigned num = 0;
-    for (int i = 0; i < str.length(); ++i) {
-        if (i != 0 and i % 4 == 0) {
-            arr.push_back(num);
-            num = 0;
-        }
-        num = num | (BYTE(str[i]) << ((i % 4) * 8));
-    }
-    arr.push_back(num);
-
-    for (int i = 0; i < (arr.size() % 4); ++i)
-        arr.push_back(0);
-
-    return arr;
-}
-
-std::string masDWORDtoString(const std::vector<unsigned> &arr) {
-    std::string str;
-    for (const auto num : arr) {
-        for (int i = 0; i < 4; ++i) {
-            BYTE symb = static_cast<BYTE>(num >> (i * 8));
-            str += char(symb);
-        }
-    }
-
-    return str;
-}
-
-std::string getBits(const std::vector<DWORD> &arr) {
+std::string getBits(const std::vector<unsigned> &arr) {
     std::string arrBits;
     for (const auto dword : arr) {
         std::bitset<32> bits(dword);
@@ -95,7 +70,7 @@ std::string getBits(const std::vector<DWORD> &arr) {
     return arrBits;
 }
 
-void distribution(const std::vector<DWORD> &encrypt) {
+void distribution(const std::vector<unsigned> &encrypt) {
     std::string encBits = getBits(encrypt);
 
     unsigned col = 0;
@@ -108,7 +83,7 @@ void distribution(const std::vector<DWORD> &encrypt) {
     std::cout << (encBits.length() - col) * 1.0 / encBits.length() * 100 << "%\n";
 }
 
-void corrCoef(const std::vector<DWORD> &encrypt, const std::vector<DWORD> &decrypt) {
+void corrCoef(const std::vector<unsigned> &encrypt, const std::vector<unsigned> &decrypt) {
     std::string encBits = getBits(encrypt);
     std::string decBits = getBits(decrypt);
 

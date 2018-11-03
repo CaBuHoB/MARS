@@ -148,7 +148,7 @@ MARS::MARS() {
     mod = 4294967296;
 }
 
-void MARS::setKey(const std::vector<DWORD> &key) {
+void MARS::setKey(const std::vector<unsigned> &key) {
     std::array<DWORD, 15> T{};
     std::copy(key.begin(), key.end(), K.begin());
     std::copy(key.begin(), key.end(), T.begin());
@@ -291,7 +291,7 @@ void MARS::r_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i) {
     d = d ^ out3;
 }
 
-std::array<DWORD, 4> MARS::encrypt(const std::array<DWORD, 4> &inBlock, const std::vector<DWORD> &key) {
+std::array<DWORD, 4> MARS::encrypt(const std::array<unsigned, 4> &inBlock, const std::vector<unsigned> &key) {
     setKey(key);
 
     std::array<DWORD, 4> D{};
@@ -336,7 +336,7 @@ std::array<DWORD, 4> MARS::encrypt(const std::array<DWORD, 4> &inBlock, const st
     return D;
 }
 
-std::array<DWORD, 4> MARS::decrypt(const std::array<DWORD, 4> &inBlock, const std::vector<DWORD> &key) {
+std::array<DWORD, 4> MARS::decrypt(const std::array<unsigned, 4> &inBlock, const std::vector<unsigned> &key) {
     setKey(key);
 
     std::array<DWORD, 4> D{};
@@ -382,13 +382,13 @@ std::array<DWORD, 4> MARS::decrypt(const std::array<DWORD, 4> &inBlock, const st
     return D;
 }
 
-std::vector<DWORD> MARS::getRandomKey() {
+std::vector<unsigned> MARS::getRandomKey() {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution unfLen(4, 14);
-    std::uniform_int_distribution<DWORD> unfNum(0, 4294967295);
+    std::uniform_int_distribution<unsigned> unfNum(0, 4294967295);
 
-    std::vector<DWORD> key;
+    std::vector<unsigned> key;
     int len = unfLen(gen);
     for (int i = 0; i < len; i++)
         key.push_back(unfNum(gen));
