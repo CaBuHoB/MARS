@@ -6,10 +6,6 @@
 #include <cmath>
 
 
-using DWORD = unsigned long;
-using BYTE = unsigned char;
-
-
 std::vector<unsigned> fileToDWORDmas(const std::string &filePath) {
     std::ifstream fs(filePath, std::ios_base::out | std::ios_base::binary);
     if (fs.fail()) {

@@ -3,7 +3,7 @@
 #include <filesystem>
 
 #include "MARS/Mars.h"
-#include "workWithMessages.h"
+#include "workWithFilesAndCiphertext.h"
 
 int main() {
     std::string filePath = "Files/image.bmp";
