@@ -29,3 +29,6 @@ compile_commands.json
 CTestTestfile.cmake
 cmake-build-debug
 .idea
+Correlation.ipynb
+.ipynb_checkpoints
+.ipynb_checkpoints/

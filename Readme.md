@@ -5,23 +5,24 @@ MARS is a shared-key block cipher, with a block size of 128 bits and a variable 
 ## Quick Start
 
     int main() {
-        std::string message =   "MARS - a candidate cipher for AES. "
-                                "MARS is a shared-key block cipher, with a block size of 128 bits and "
-                                "a variable key size, ranging from 128 to over 400 bits.";
+        std::string filePath = "Files/image.bmp";
         ...
     }
 
-Variable "message" assign the message you want to encode. As a result of the program, you will receive a randomly generated key, ciphertext with the distribution of "0" and "1", a decoded message and correlation coefficient for the input and output flow of the algorithm:
+The variable “filePath” stores the path to the file you want to encode. As a result of the program, you will receive a randomly generated key, a encrypted file and its distribution “0” and “1”, a decoded file and [correlation coefficient] (https://www.socscistatistics.com/tests/pearson /) for input and output flow algorithm:
 
-    Original: MARS - a candidate cipher for AES. MARS is a shared-key block cipher, with a block size of 128 bits and a variable key size, ranging from 128 to over 400 bits.
-    Key: 1287413327 504862387 152522607 782537283 907780779 1590089769 1842987796 1456145547 454841597 1199799222 1149427744 1606081808 865661574 87959568
+    Key: 3260612125 272058955 999978797 1531222562 3216983359 4229743952 1255236363 1409535726 3705650868 2625221404 69201554 2588950460 2859282161 3395239520
 
-    Ciphertext: ?X��M�t��9�t)���K^�P�fC6)�������o �.zm0s�oOcS�}�*��W��e�Ť&X�999zhpW�!�ωINY����ʻi�%l��R��,H���7�.�z m.z?{�U�@�����.<E�a�&�X��*�qA%�Wp��O�sA
-    Number of zeros: 633 49.4531%
-    Number of units: 647 50.5469%
+    Ciphertext
+    Number of zeros: 3146661 50.0047%
+    Number of units: 3146075 49.9953%
 
-    Plaintext: MARS - a candidate cipher for AES. MARS is a shared-key block cipher, with a block size of 128 bits and a variable key size, ranging from 128 to over 400 bits.
-    Corrcoef: 0.0129283
+    Corrcoef: 9.55003e-06
+
+    "Files/image.bmp" - original file.
+    "Files/image_encrypt.bmp" - encrypted file.
+    "Files/image_encrypt_decrypt.bmp" - decrypted file.
+
 
 If you want to enter your key, replace the line in main:
 
@@ -35,7 +36,7 @@ The key must be between 4 and 14 32-bit words, for example:
 
     int main() {
         ...
-        std::vector<DWORD> key = {1, 2, 3, 4};
+        std::vector<unsigned> key = {1, 2, 3, 4};
         ...
     }
 

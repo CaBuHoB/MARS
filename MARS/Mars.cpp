@@ -8,8 +8,8 @@
 #include "Mars.h"
 
 
-#define rotr(x, n) _lrotr(x,n)
-#define rotl(x, n) _lrotl(x,n)
+#define rotr(x, n) _rotr(x,n)
+#define rotl(x, n) _rotl(x,n)
 
 
 MARS::MARS() {
@@ -145,9 +145,10 @@ MARS::MARS() {
                                                      0xab561187, 0x14eea0f0, 0xdf0d4164, 0x19af70ee
                                              });
     std::copy(init.begin(), init.end(), S);
+    mod = 4294967296;
 }
 
-void MARS::setKey(const std::vector<DWORD> &key) {
+void MARS::setKey(const std::vector<unsigned> &key) {
     std::array<DWORD, 15> T{};
     std::copy(key.begin(), key.end(), K.begin());
     std::copy(key.begin(), key.end(), T.begin());
@@ -155,10 +156,12 @@ void MARS::setKey(const std::vector<DWORD> &key) {
 
     for (int j = 0; j < 4; j++) {
         for (int i = 0; i < 15; i++) {
-            T[i] = T[i] ^ rotl(T[(i + 8) % 15] ^ T[(i + 13) % 15], 3) ^ (4 * i + j);
+            auto for_rot = static_cast<unsigned int>(T[(i + 8) % 15] ^ T[(i + 13) % 15]);
+            T[i] = T[i] ^ rotl(for_rot, 3) ^ (4 * i + j);
         }
         for (int i = 0; i < 15; i++) {
-            T[i] = rotl(T[i] + S[511 & T[(i + 14) % 15]], 9);
+            auto for_rot = static_cast<unsigned int>((T[i] + S[511 & T[(i + 14) % 15]]) % mod);
+            T[i] = rotl(for_rot, 9);
         }
         for (int i = 0; i < 10; i++) {
             K[10 * j + i] = T[(4 * i) % 15];
@@ -172,52 +175,54 @@ void MARS::setKey(const std::vector<DWORD> &key) {
         DWORD w = K[i] | 3;
 
         DWORD M = makeMask(w);
-        DWORD p = rotl(B[j], 31 & K[i - 1]);
+        auto for_rot = static_cast<unsigned int>(B[j]);
+        DWORD p = rotl(for_rot, 31 & K[i - 1]);
         K[i] = w ^ (p & M);
     }
 }
 
 DWORD MARS::makeMask(DWORD x) {
-    DWORD m;
+    // TODO: упростить
+    auto binary = std::bitset<32>(x);
+    std::string mask_str;
 
-    /* if m{bn} stands for bit number bn of m, set m{bn} = 1 if */
-    /* x{bn} == x{bn+1} for 0 <= bn <= 30.  That is, set a bit  */
-    /* in m if the corresponding bit and the next higher bit in */
-    /* x are equal in value (set m{31} = 0).                    */
+    int count = 0;
+    bool bit = false;
+    for (int ind = 31; ind >= 0; ind--) {
+        if (count == 0) {
+            bit = binary[ind];
+            count++;
+        } else if (bit != binary[ind]) {
+            if (count >= 10) {
+                mask_str += std::string(static_cast<unsigned long>(count), '1');
+            } else {
+                mask_str += std::string(static_cast<unsigned long>(count), '0');
+            }
+            count = 1;
+            bit = binary[ind];
+        } else {
+            count++;
+        }
+        if (ind == 0) {
+            if (count >= 10) {
+                mask_str += std::string(static_cast<unsigned long>(count), '1');
+            } else {
+                mask_str += std::string(static_cast<unsigned long>(count), '0');
+            }
+        }
+    }
 
-    m = (~x ^ (x >> 1)) & 0x7fffffff;
+    auto mask_binary = std::bitset<32>(mask_str);
+    mask_binary[31] = false;
+    mask_binary[30] = false;
+    mask_binary[0] = false;
 
-    /* Sequences of 9 '1' bits in m now correspond to sequences */
-    /* of 10 '0's or 10 '1' bits in x.  Shift and 'and' bits in */
-    /* m to find sequences of 9 or more '1' bits.   As a result */
-    /* bits in m are set if they are at the bottom of sequences */
-    /* of 10 adjacent '0's or 10 adjacent '1's in x.            */
+    for (int ind = 30; ind >= 0; ind--) {
+        if (binary[ind] != binary[ind + 1] or binary[ind] != binary[ind - 1])
+            mask_binary[ind] = false;
+    }
 
-    m &= (m >> 1) & (m >> 2);
-    m &= (m >> 3) & (m >> 6);
-
-    if (!m)  /* return if mask is empty - no key fixing needed   */
-        /* is this early return worthwhile?                 */
-        return 0;
-
-    /* We need the internal bits in each continuous sequence of */
-    /* matching bits (that is the bits less the two endpoints). */
-    /* We thus propagate each set bit into the 8 internal bits  */
-    /* that it represents, starting 1 left and finsihing 8 left */
-    /* of its position.                                         */
-
-    m <<= 1;
-    m |= (m << 1);
-    m |= (m << 2);
-    m |= (m << 4);
-
-    /* m is now correct except for the odd behaviour of bit 31, */
-    /* that is, it will be set if it is in a sequence of 10 or  */
-    /* more '0's and clear otherwise.                           */
-
-    m |= (m << 1) & ~x & 0x80000000;
-
-    return m & 0xfffffffc;
+    return mask_binary.to_ulong();
 }
 
 std::tuple<DWORD, DWORD, DWORD> MARS::e_func(const DWORD &in, const DWORD &key1, const DWORD &key2) {
@@ -225,71 +230,80 @@ std::tuple<DWORD, DWORD, DWORD> MARS::e_func(const DWORD &in, const DWORD &key1,
     DWORD M;
     DWORD R;
 
-    M = in + key1;
-    R = rotl(in, 13) * key2;
+    M = (in + key1) % mod;
+    auto for_rot = static_cast<unsigned int>(in);
+    R = rotl(for_rot, 13) * key2;
     DWORD i = 511 & M;
     L = S[i];
-    R = rotl(R, 5);
+    for_rot = static_cast<unsigned int>(R);
+    R = rotl(for_rot, 5);
     DWORD r = 31 & R;
-    M = rotl(M, r);
+    for_rot = static_cast<unsigned int>(M);
+    M = rotl(for_rot, r);
     L = L ^ R;
-    R = rotl(R, 5);
+    for_rot = static_cast<unsigned int>(R);
+    R = rotl(for_rot, 5);
     L = L ^ R;
     r = 31 & R;
-    L = rotl(L, r);
+    for_rot = static_cast<unsigned int>(L);
+    L = rotl(for_rot, r);
 
     return {L, M, R};
 }
 
 void MARS::f_mix(DWORD &a, DWORD &b, DWORD &c, DWORD &d) {
-    DWORD r = rotr(a, 8);
+    auto for_rot = static_cast<unsigned int>(a);
+    DWORD r = rotr(for_rot, 8);
     b ^= S[a & 255];
-    b += S[(r & 255) + 256];
-    r = rotr(a, 16);
-    a = rotr(a, 24);
-    c += S[r & 255];
+    b = (b + S[(r & 255) + 256]) % mod;
+    r = rotr(for_rot, 16);
+    a = rotr(for_rot, 24);
+    c = (c + S[r & 255]) % mod;
     d ^= S[(a & 255) + 256];
 }
 
 void MARS::b_mix(DWORD &a, DWORD &b, DWORD &c, DWORD &d) {
-    DWORD r = rotl(a, 8);
+    auto for_rot = static_cast<unsigned int>(a);
+    DWORD r = rotl(for_rot, 8);
     b ^= S[(a & 255) + 256];
-    c -= S[r & 255];
-    r = rotl(a, 16);
-    a = rotl(a, 24);
-    d -= S[(r & 255) + 256];
+    c = (mod + c - S[r & 255]) % mod;
+    r = rotl(for_rot, 16);
+    a = rotl(for_rot, 24);
+    d = (mod + d - S[(r & 255) + 256]) % mod;
     d ^= S[a & 255];
 }
 
 void MARS::f_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i) {
     auto[out1, out2, out3] = e_func(a, K[2 * i + 4], K[2 * i + 5]);
-    a = rotl(a, 13);
-    c = c + out2;
-    b = b + out1;
+    auto for_rot = static_cast<unsigned int>(a);
+    a = rotl(for_rot, 13);
+    c = (c + out2) % mod;
+    b = (b + out1) % mod;
     d = d ^ out3;
 }
 
 void MARS::r_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i) {
-    a = rotr(a, 13);
+    auto for_rot = static_cast<unsigned int>(a);
+    a = rotr(for_rot, 13);
     auto[out1, out2, out3] = e_func(a, K[2 * i + 4], K[2 * i + 5]);
-    c = c - out2;
-    b = b - out1;
+    c = (mod + c - out2) % mod;
+    b = (mod + b - out1) % mod;
     d = d ^ out3;
 }
 
-std::array<DWORD, 4> MARS::encrypt(const std::array<DWORD, 4> &inBlock, const std::vector<DWORD> &key) {
+std::array<DWORD, 4> MARS::encrypt(const std::array<unsigned, 4> &inBlock, const std::vector<unsigned> &key) {
     setKey(key);
 
     std::array<DWORD, 4> D{};
     for (int i = 0; i < 4; ++i)
-        D[i] = inBlock[i] + K[i];
+        D[i] = (inBlock[i] + K[i]) % mod;
 
     for (int i = 0; i < 8; ++i) {
         f_mix(D[0], D[1], D[2], D[3]);
         if (i == 0 or i == 4)
-            D[0] += D[3];
+            D[0] = (D[0] + D[3]) % mod;
         if (i == 1 or i == 5)
-            D[0] += D[1];
+            D[0] = (D[0] + D[1]) % mod;
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
 
@@ -309,32 +323,32 @@ std::array<DWORD, 4> MARS::encrypt(const std::array<DWORD, 4> &inBlock, const st
     for (int i = 0; i < 8; ++i) {
         b_mix(D[0], D[1], D[2], D[3]);
         if (i == 1 or i == 5)
-            D[1] -= D[0];
+            D[1] = (mod + D[1] - D[0]) % mod;
         if (i == 2 or i == 6)
-            D[1] -= D[2];
+            D[1] = (mod + D[1] - D[2]) % mod;
 
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
 
     for (int i = 0; i < 4; ++i)
-        D[i] = D[i] - K[i + 36];
+        D[i] = (mod + D[i] - K[i + 36]) % mod;
 
     return D;
 }
 
-std::array<DWORD, 4> MARS::decrypt(const std::array<DWORD, 4> &inBlock, const std::vector<DWORD> &key) {
+std::array<DWORD, 4> MARS::decrypt(const std::array<unsigned, 4> &inBlock, const std::vector<unsigned> &key) {
     setKey(key);
 
     std::array<DWORD, 4> D{};
     for (int i = 0; i < 4; ++i)
-        D[3 - i] = inBlock[i] + K[i + 36];
+        D[3 - i] = (inBlock[i] + K[i + 36]) % mod;
 
     for (int i = 0; i < 8; ++i) {
         f_mix(D[0], D[1], D[2], D[3]);
         if (i == 0 or i == 4)
-            D[0] += D[3];
+            D[0] = (D[0] + D[3]) % mod;
         if (i == 1 or i == 5)
-            D[0] += D[1];
+            D[0] = (D[0] + D[1]) % mod;
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
 
@@ -354,26 +368,27 @@ std::array<DWORD, 4> MARS::decrypt(const std::array<DWORD, 4> &inBlock, const st
     for (int i = 0; i < 8; ++i) {
         b_mix(D[0], D[1], D[2], D[3]);
         if (i == 1 or i == 5)
-            D[1] -= D[0];
+            D[1] = (mod + D[1] - D[0]) % mod;
         if (i == 2 or i == 6)
-            D[1] -= D[2];
+            D[1] = (mod + D[1] - D[2]) % mod;
 
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
 
     for (int i = 0; i < 4; ++i)
-        D[i] = D[i] - K[3 - i];
+        D[i] = (mod + D[i] - K[3 - i]) % mod;;
     std::reverse(D.begin(), D.end());
 
     return D;
 }
 
-std::vector<DWORD> MARS::getRandomKey() {
-    std::mt19937 gen(static_cast<unsigned int>(std::chrono::system_clock::now().time_since_epoch().count()));
+std::vector<unsigned> MARS::getRandomKey() {
+    std::random_device rd;
+    std::mt19937 gen(rd());
     std::uniform_int_distribution unfLen(4, 14);
-    std::uniform_int_distribution unfNum(0, 2147483647);
+    std::uniform_int_distribution<unsigned> unfNum(0, 4294967295);
 
-    std::vector<DWORD> key;
+    std::vector<unsigned> key;
     int len = unfLen(gen);
     for (int i = 0; i < len; i++)
         key.push_back(unfNum(gen));
