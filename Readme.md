@@ -4,12 +4,14 @@ MARS is a shared-key block cipher, with a block size of 128 bits and a variable 
 
 ## Quick Start
 
-    int main() {
-        std::string filePath = "Files/image.bmp";
-        ...
-    }
+```C++
+int main() {
+    std::string filePath = "Files/image.bmp";
+    ...
+}
+```
 
-The variable “filePath” stores the path to the file you want to encode. As a result of the program, you will receive a randomly generated key, a encrypted file and its distribution “0” and “1”, a decoded file and [correlation coefficient] (https://www.socscistatistics.com/tests/pearson /) for input and output flow algorithm:
+The variable “filePath” stores the path to the file you want to encode. As a result of the program, you will receive a randomly generated key, a encrypted file and its distribution “0” and “1”, a decoded file and [correlation coefficient](https://www.socscistatistics.com/tests/pearson/) for input and output flow algorithm:
 
     Key: 3260612125 272058955 999978797 1531222562 3216983359 4229743952 1255236363 1409535726 3705650868 2625221404 69201554 2588950460 2859282161 3395239520
 
@@ -26,19 +28,23 @@ The variable “filePath” stores the path to the file you want to encode. As a
 
 If you want to enter your key, replace the line in main:
 
-    int main() {
-        ...
-        auto key = mars.getRandomKey();
-        ...
-    }
+```C++
+int main() {
+    ...
+    auto key = mars.getRandomKey();
+    ...
+}
+```
 
 The key must be between 4 and 14 32-bit words, for example:
 
-    int main() {
-        ...
-        std::vector<unsigned> key = {1, 2, 3, 4};
-        ...
-    }
+```C++
+int main() {
+    ...
+    std::vector<unsigned> key = {1, 2, 3, 4};
+    ...
+}
+```
 
 ## References
 - [MARS - a candidate cipher for AES](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.35.5604&rep=rep1&type=pdf).
