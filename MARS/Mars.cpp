@@ -284,7 +284,7 @@ void MARS::f_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i) {
 
 void MARS::r_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i) {
     auto for_rot = static_cast<unsigned int>(a);
-    a = rotl(for_rot, 13);
+    a = rotr(for_rot, 13);
     auto[out1, out2, out3] = e_func(a, K[2 * i + 4], K[2 * i + 5]);
     c = (mod + c - out2) % mod;
     b = (mod + b - out1) % mod;
@@ -307,28 +307,28 @@ std::array<DWORD, 4> MARS::encrypt(const std::array<DWORD, 4> &inBlock, const st
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
 
-//    for (DWORD i = 0; i < 16; ++i) {
-//        f_trans(D[0], D[1], D[2], D[3], i);
-//        if (i < 8)
-//            std::rotate(D.begin(), D.begin() + 1, D.end());
-//        else
-//            std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
-//
-//        if (i == 7)
-//            std::swap(D[1], D[3]);
-//        if (i == 15)
-//            std::swap(D[1], D[3]);
-//    }
-//
-//    for (int i = 0; i < 8; ++i) {
-//        b_mix(D[0], D[1], D[2], D[3]);
-//        if (i == 1 or i == 5)
-//            D[1] = (mod + D[1] - D[0]) % mod;
-//        if (i == 2 or i == 6)
-//            D[1] = (mod + D[1] - D[2]) % mod;
-//
-//        std::rotate(D.begin(), D.begin() + 1, D.end());
-//    }
+    for (DWORD i = 0; i < 16; ++i) {
+        f_trans(D[0], D[1], D[2], D[3], i);
+        if (i < 8)
+            std::rotate(D.begin(), D.begin() + 1, D.end());
+        else
+            std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
+
+        if (i == 7)
+            std::swap(D[1], D[3]);
+        if (i == 15)
+            std::swap(D[1], D[3]);
+    }
+
+    for (int i = 0; i < 8; ++i) {
+        b_mix(D[0], D[1], D[2], D[3]);
+        if (i == 1 or i == 5)
+            D[1] = (mod + D[1] - D[0]) % mod;
+        if (i == 2 or i == 6)
+            D[1] = (mod + D[1] - D[2]) % mod;
+
+        std::rotate(D.begin(), D.begin() + 1, D.end());
+    }
 
     for (int i = 0; i < 4; ++i)
         D[i] = (mod + D[i] - K[i + 36]) % mod;
@@ -351,29 +351,29 @@ std::array<DWORD, 4> MARS::decrypt(const std::array<DWORD, 4> &inBlock, const st
             D[0] = (D[0] + D[1]) % mod;
         std::rotate(D.begin(), D.begin() + 1, D.end());
     }
-//
-//    for (DWORD i = 0; i < 16; ++i) {
-//        r_trans(D[0], D[1], D[2], D[3], 15 - i);
-//        if (i < 8)
-//            std::rotate(D.begin(), D.begin() + 1, D.end());
-//        else
-//            std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
-//
-//        if (i == 7)
-//            std::swap(D[1], D[3]);
-//        if (i == 15)
-//            std::swap(D[1], D[3]);
-//    }
-//
-//    for (int i = 0; i < 8; ++i) {
-//        b_mix(D[0], D[1], D[2], D[3]);
-//        if (i == 1 or i == 5)
-//            D[1] = (mod + D[1] - D[0]) % mod;
-//        if (i == 2 or i == 6)
-//            D[1] = (mod + D[1] - D[2]) % mod;
-//
-//        std::rotate(D.begin(), D.begin() + 1, D.end());
-//    }
+
+    for (DWORD i = 0; i < 16; ++i) {
+        r_trans(D[0], D[1], D[2], D[3], 15 - i);
+        if (i < 8)
+            std::rotate(D.begin(), D.begin() + 1, D.end());
+        else
+            std::rotate(D.rbegin(), D.rbegin() + 1, D.rend());
+
+        if (i == 7)
+            std::swap(D[1], D[3]);
+        if (i == 15)
+            std::swap(D[1], D[3]);
+    }
+
+    for (int i = 0; i < 8; ++i) {
+        b_mix(D[0], D[1], D[2], D[3]);
+        if (i == 1 or i == 5)
+            D[1] = (mod + D[1] - D[0]) % mod;
+        if (i == 2 or i == 6)
+            D[1] = (mod + D[1] - D[2]) % mod;
+
+        std::rotate(D.begin(), D.begin() + 1, D.end());
+    }
 
     for (int i = 0; i < 4; ++i)
         D[i] = (mod + D[i] - K[3 - i]) % mod;;

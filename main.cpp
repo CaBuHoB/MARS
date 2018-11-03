@@ -27,6 +27,7 @@ int main() {
 
     filePath.insert(indexOfDot, "_encrypt");
     masDWORDtoFile(filePath, encrypt);
+//    auto encrypt2 = fileToDWORDmas(filePath);
 
     std::vector<DWORD> decrypt;
     for (int i = 0; i < encrypt.size(); i += 4) {
