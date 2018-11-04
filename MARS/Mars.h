@@ -4,36 +4,32 @@
 #include <array>
 #include <vector>
 
-using DWORD = unsigned long;
-using BYTE = unsigned char;
 
 class MARS {
 private:
-    std::array<DWORD , 40> K{};
-    DWORD S[512];
-
-    DWORD mod;
+    std::array<unsigned, 40> K;
+    std::array<unsigned, 512> S;
 
     void setKey(const std::vector<unsigned> &key);
 
-    std::tuple<DWORD, DWORD, DWORD> e_func(const DWORD &in, const DWORD &key1, const DWORD &key2);
+    std::tuple<unsigned, unsigned, unsigned> e_func(const unsigned &in, const unsigned &key1, const unsigned &key2);
 
-    void f_mix(DWORD &a, DWORD &b, DWORD &c, DWORD &d);
+    void f_mix(unsigned &a, unsigned &b, unsigned &c, unsigned &d);
 
-    void b_mix(DWORD &a, DWORD &b, DWORD &c, DWORD &d);
+    void b_mix(unsigned &a, unsigned &b, unsigned &c, unsigned &d);
 
-    void f_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i);
+    void f_trans(unsigned &a, unsigned &b, unsigned &c, unsigned &d, unsigned i);
 
-    void r_trans(DWORD &a, DWORD &b, DWORD &c, DWORD &d, DWORD i);
+    void r_trans(unsigned &a, unsigned &b, unsigned &c, unsigned &d, unsigned i);
 
-    DWORD makeMask(DWORD x);
+    unsigned makeMask(unsigned x);
 
 public:
     MARS();
 
-    std::array<DWORD, 4> encrypt(const std::array<unsigned, 4> &inBlock, const std::vector<unsigned> &key);
+    std::array<unsigned, 4> encrypt(const std::array<unsigned, 4> &inBlock, const std::vector<unsigned> &key);
 
-    std::array<DWORD, 4> decrypt(const std::array<unsigned, 4> &inBlock, const std::vector<unsigned> &key);
+    std::array<unsigned, 4> decrypt(const std::array<unsigned, 4> &inBlock, const std::vector<unsigned> &key);
 
     std::vector<unsigned> getRandomKey();
 
