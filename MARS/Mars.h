@@ -22,7 +22,7 @@ private:
 
     void r_trans(unsigned &a, unsigned &b, unsigned &c, unsigned &d, unsigned i);
 
-    unsigned makeMask(unsigned x);
+    unsigned makeMask(unsigned w);
 
 public:
     MARS();

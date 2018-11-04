@@ -174,48 +174,24 @@ void MARS::setKey(const std::vector<unsigned> &key) {
     }
 }
 
-unsigned MARS::makeMask(unsigned x) {
-    // TODO: упростить
-    auto binary = std::bitset<32>(x);
-    std::string mask_str;
+unsigned MARS::makeMask(unsigned w) {
+    unsigned m = (~w ^ (w >> 1)) & 0x7fffffff;
 
-    int count = 0;
-    bool bit = false;
-    for (int ind = 31; ind >= 0; ind--) {
-        if (count == 0) {
-            bit = binary[ind];
-            count++;
-        } else if (bit != binary[ind]) {
-            if (count >= 10) {
-                mask_str += std::string(static_cast<unsigned long>(count), '1');
-            } else {
-                mask_str += std::string(static_cast<unsigned long>(count), '0');
-            }
-            count = 1;
-            bit = binary[ind];
-        } else {
-            count++;
-        }
-        if (ind == 0) {
-            if (count >= 10) {
-                mask_str += std::string(static_cast<unsigned long>(count), '1');
-            } else {
-                mask_str += std::string(static_cast<unsigned long>(count), '0');
-            }
-        }
-    }
+    m &= (m >> 1) & (m >> 2);
+    m &= (m >> 3) & (m >> 6);
 
-    auto mask_binary = std::bitset<32>(mask_str);
-    mask_binary[31] = false;
-    mask_binary[30] = false;
-    mask_binary[0] = false;
+    m <<= 1;
+    m |= (m << 1);
+    m |= (m << 2);
+    m |= (m << 4);
+    m |= (m << 1);
+    m |= (m >> 1);
 
-    for (int ind = 30; ind >= 0; ind--) {
-        if (binary[ind] != binary[ind + 1] or binary[ind] != binary[ind - 1])
-            mask_binary[ind] = false;
-    }
 
-    return static_cast<unsigned>(mask_binary.to_ulong());
+    m &= 0x3FFFFFFE;
+    m &= ~((~(w << 1) ^ w) ^ (~(w >> 1) ^ w));
+
+    return m;
 }
 
 std::tuple<unsigned, unsigned, unsigned> MARS::e_func(const unsigned &in, const unsigned &key1, const unsigned &key2) {
